@@ -176,6 +176,23 @@ def test_channel_format_hint_whatsapp(tmp_path) -> None:
     assert "plain text only" in prompt
 
 
+def test_channel_format_hint_voice(tmp_path) -> None:
+    """Speech channels get the write-for-the-ear hint from the system prompt.
+
+    Without a branch here, every voice channel has to inject the same
+    guidance per message, where it is persisted into each user row.
+    """
+    workspace = _make_workspace(tmp_path)
+    builder = ContextBuilder(workspace)
+
+    prompt = builder.build_system_prompt(channel="voice")
+    assert "Format Hint" in prompt
+    assert "spoken aloud" in prompt
+    # The hint must not read as a capability restriction: voice personas make
+    # models refuse work they can do.
+    assert "same tools and skills" in prompt
+
+
 def test_channel_format_hint_absent_for_unknown(tmp_path) -> None:
     """Unknown or None channel should not inject a format hint."""
     workspace = _make_workspace(tmp_path)

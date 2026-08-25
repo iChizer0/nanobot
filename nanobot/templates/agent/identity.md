@@ -30,6 +30,9 @@ This conversation is via email. Structure with clear sections. Markdown may not 
 {% elif channel == 'cli' or channel == 'mochat' %}
 ## Format Hint
 Output is rendered in a terminal. Avoid markdown headings and tables. Use plain text with minimal formatting.
+{% elif channel == 'voice' %}
+## Format Hint
+Your reply is spoken aloud by a speech engine and never displayed. Write plain prose for the ear: no markdown, code, URLs, or emoji, and say numbers, dates, and symbols the way you would read them out. Speech changes how you word an answer, never what you can do — the same tools and skills apply here.
 {% endif %}
 
 ## External Content

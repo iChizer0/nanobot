@@ -16,7 +16,7 @@ from datetime import datetime
 from enum import Enum, auto
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Literal, TypeVar, cast
 
 from loguru import logger
 
@@ -273,6 +273,7 @@ class AgentLoop:
         max_concurrent_subagents: int | None = None,
         context_window_tokens: int | None = None,
         max_tool_result_chars: int | None = None,
+        replay_reasoning: Literal["recent", "all", "none"] | None = None,
         provider_retry_mode: str = "standard",
         tool_hint_max_length: int | None = None,
         cron_service: CronService | None = None,
@@ -348,6 +349,9 @@ class AgentLoop:
             max_tool_result_chars
             if max_tool_result_chars is not None
             else defaults.max_tool_result_chars
+        )
+        self.replay_reasoning = (
+            replay_reasoning if replay_reasoning is not None else defaults.replay_reasoning
         )
         self.provider_retry_mode = provider_retry_mode
         self.tool_hint_max_length = (
@@ -504,6 +508,7 @@ class AgentLoop:
             max_concurrent_subagents=defaults.max_concurrent_subagents,
             context_window_tokens=context_window_tokens,
             max_tool_result_chars=defaults.max_tool_result_chars,
+            replay_reasoning=defaults.replay_reasoning,
             provider_retry_mode=defaults.provider_retry_mode,
             tool_hint_max_length=defaults.tool_hint_max_length,
             restrict_to_workspace=config.tools.restrict_to_workspace,
@@ -1894,7 +1899,10 @@ class AgentLoop:
             session = ctx.require_session()
         is_subagent = ctx.kind is TurnKind.SYSTEM and ctx.msg.sender_id == "subagent"
 
-        ctx.history = session.get_history(extend_to_user=is_subagent)
+        ctx.history = session.get_history(
+            extend_to_user=is_subagent,
+            replay_reasoning=self.replay_reasoning,
+        )
         stored_state = session.provider_state
         subagent_followup_persisted = False
         if is_subagent:

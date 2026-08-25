@@ -761,3 +761,72 @@ def test_get_history_extend_to_user_keeps_newer_user_inside_window():
 
     assert [m["content"] for m in history] == ["new question", "new answer"]
     _assert_no_orphans(history)
+
+
+# --- Reasoning replay is bounded to the turn that still needs it ---
+
+def _reasoning_session() -> Session:
+    session = Session(key="telegram:reasoning")
+    session.messages.extend([
+        {"role": "user", "content": "first question"},
+        {
+            "role": "assistant",
+            "content": "first answer",
+            "reasoning_content": "old chain of thought",
+            "thinking_blocks": [{"type": "thinking", "thinking": "old", "signature": "s1"}],
+        },
+        {"role": "user", "content": "second question"},
+        {
+            "role": "assistant",
+            "content": None,
+            "reasoning_content": "current chain of thought",
+            "thinking_blocks": [{"type": "thinking", "thinking": "now", "signature": "s2"}],
+            "tool_calls": [
+                {"id": "call_1", "type": "function", "function": {"name": "x", "arguments": "{}"}}
+            ],
+        },
+        {"role": "tool", "tool_call_id": "call_1", "name": "x", "content": "ok"},
+    ])
+    return session
+
+
+def test_get_history_replays_reasoning_only_for_the_recent_turn():
+    session = _reasoning_session()
+
+    history = session.get_history(replay_reasoning="recent")
+
+    older, recent = history[1], history[3]
+    assert "reasoning_content" not in older
+    assert "thinking_blocks" not in older
+    # The unfinished tool loop keeps the thinking blocks that belong with its
+    # tool calls.
+    assert recent["reasoning_content"] == "current chain of thought"
+    assert recent["thinking_blocks"][0]["signature"] == "s2"
+
+    # Bounding is a replay decision only; the record stays complete for
+    # display and consolidation.
+    assert session.messages[1]["reasoning_content"] == "old chain of thought"
+
+
+def test_get_history_replay_reasoning_modes():
+    session = _reasoning_session()
+
+    every = session.get_history(replay_reasoning="all")
+    assert every[1]["reasoning_content"] == "old chain of thought"
+    assert every[3]["reasoning_content"] == "current chain of thought"
+
+    none = session.get_history(replay_reasoning="none")
+    assert all("reasoning_content" not in message for message in none)
+    assert all("thinking_blocks" not in message for message in none)
+
+
+def test_get_history_keeps_reasoning_when_no_turn_boundary_is_visible():
+    """A window holding only assistant/tool rows cannot tell turns apart."""
+    session = Session(key="telegram:no-boundary")
+    session.messages.extend([
+        {"role": "assistant", "content": "answer", "reasoning_content": "why"},
+    ])
+
+    history = session.get_history(replay_reasoning="recent")
+
+    assert history[0]["reasoning_content"] == "why"

@@ -1704,6 +1704,18 @@ nanobot uses a shared SSRF guard for built-in web fetches and HTTP/SSE MCP conne
 
 Keep whitelist entries as narrow as possible, such as a single host CIDR (`192.168.1.50/32`). The whitelist is global for the shared SSRF guard; it is not limited to one tool or one MCP server.
 
+`exec` has its own loopback rule: commands are checked for internal URLs, and only a WebUI Full Access turn on an unrestricted workspace may reach `localhost` (switch it off with `tools.webuiAllowLocalServiceAccess: false`). Turns from other channels are blocked, because whoever is talking to a chat channel is not necessarily whoever runs the services beside the gateway. Name a channel in `tools.localServiceAccessChannels` to grant it the same access:
+
+```json
+{
+  "tools": {
+    "localServiceAccessChannels": ["voice"]
+  }
+}
+```
+
+The workspace still has to be unrestricted for the turn; `tools.restrictToWorkspace` continues to block loopback for every channel.
+
 HTTP/SSE MCP connections use the same process-wide proxy environment behavior as `web_fetch`: proxied targets use the configured proxy, and URLs excluded by `NO_PROXY` remain DNS-pinned direct connections.
 
 > [!TIP]

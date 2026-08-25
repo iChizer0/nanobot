@@ -85,6 +85,57 @@ def test_exec_full_workspace_scope_blocks_loopback_when_local_service_disabled(t
     assert "internal/private" in error
 
 
+def test_exec_other_channel_blocks_loopback_until_opted_in(tmp_path):
+    """A chat channel gets no localhost access just by being unrestricted."""
+    tool = ExecTool(working_dir=str(tmp_path))
+    scope = build_workspace_scope(tmp_path, "full", source_channel="voice")
+    token = bind_workspace_scope(scope)
+    try:
+        with patch("nanobot.security.network.socket.getaddrinfo", _fake_resolve_localhost):
+            error = tool._guard_command("curl http://localhost:8765/", str(tmp_path))
+    finally:
+        reset_workspace_scope(token)
+    assert error is not None
+    assert "internal/private" in error
+
+
+def test_exec_opted_in_channel_allows_loopback(tmp_path):
+    tool = ExecTool(working_dir=str(tmp_path), local_service_access_channels=["Voice"])
+    scope = build_workspace_scope(tmp_path, "full", source_channel="voice")
+    token = bind_workspace_scope(scope)
+    try:
+        with patch("nanobot.security.network.socket.getaddrinfo", _fake_resolve_localhost):
+            error = tool._guard_command("curl http://localhost:8765/", str(tmp_path))
+    finally:
+        reset_workspace_scope(token)
+    assert error is None
+
+
+def test_exec_opted_in_channel_still_blocked_when_restricted(tmp_path):
+    tool = ExecTool(working_dir=str(tmp_path), local_service_access_channels=["voice"])
+    scope = build_workspace_scope(tmp_path, "restricted", source_channel="voice")
+    token = bind_workspace_scope(scope)
+    try:
+        with patch("nanobot.security.network.socket.getaddrinfo", _fake_resolve_localhost):
+            error = tool._guard_command("curl http://localhost:8765/", str(tmp_path))
+    finally:
+        reset_workspace_scope(token)
+    assert error is not None
+    assert "internal/private" in error
+
+
+def test_exec_opt_in_does_not_extend_to_other_channels(tmp_path):
+    tool = ExecTool(working_dir=str(tmp_path), local_service_access_channels=["voice"])
+    scope = build_workspace_scope(tmp_path, "full", source_channel="telegram")
+    token = bind_workspace_scope(scope)
+    try:
+        with patch("nanobot.security.network.socket.getaddrinfo", _fake_resolve_localhost):
+            error = tool._guard_command("curl http://localhost:8765/", str(tmp_path))
+    finally:
+        reset_workspace_scope(token)
+    assert error is not None
+
+
 def test_exec_restricted_workspace_scope_blocks_loopback(tmp_path):
     tool = ExecTool(working_dir=str(tmp_path))
     scope = build_workspace_scope(tmp_path, "restricted", source_channel="websocket")

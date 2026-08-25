@@ -181,6 +181,7 @@ class ExecTool(Tool):
             timeout=cfg.timeout,
             restrict_to_workspace=ctx.config.restrict_to_workspace,
             webui_allow_local_service_access=ctx.config.webui_allow_local_service_access,
+            local_service_access_channels=ctx.config.local_service_access_channels,
             sandbox=cfg.sandbox,
             path_prepend=cfg.path_prepend,
             path_append=cfg.path_append,
@@ -200,6 +201,7 @@ class ExecTool(Tool):
         allow_patterns: list[str] | None = None,
         restrict_to_workspace: bool = False,
         webui_allow_local_service_access: bool = True,
+        local_service_access_channels: list[str] | None = None,
         allow_local_preview_access: bool | None = None,
         sandbox: str = "",
         path_prepend: str = "",
@@ -236,6 +238,11 @@ class ExecTool(Tool):
         if allow_local_preview_access is not None:
             webui_allow_local_service_access = allow_local_preview_access
         self.webui_allow_local_service_access = webui_allow_local_service_access
+        self.local_service_access_channels = frozenset(
+            name.strip().lower()
+            for name in (local_service_access_channels or [])
+            if name and name.strip()
+        )
         self.path_prepend = path_prepend
         self.path_append = path_append
         self.sandbox_ro_binds = self._normalize_bind_roots(sandbox_ro_binds)
@@ -838,6 +845,7 @@ class ExecTool(Tool):
             cmd,
             allow_loopback=current_scope_allows_loopback(
                 enabled=self.webui_allow_local_service_access,
+                channels=self.local_service_access_channels,
             ),
         ):
             # The runner turns this marker into a non-retryable security hint.

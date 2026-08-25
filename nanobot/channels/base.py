@@ -198,6 +198,22 @@ class BaseChannel(ABC):
         """
         return
 
+    async def send_retry_wait(
+        self,
+        chat_id: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Report that the turn is waiting out a provider retry backoff.
+
+        Default is no-op. A backoff is indistinguishable from a wedged turn
+        from outside the agent loop, so channels that surface liveness (a
+        typing indicator, a status line, a watchdog that would otherwise
+        abandon the turn) override this. Notices repeat while the wait runs,
+        counting down, and are gated by the channel's ``send_progress``.
+        """
+        return
+
     async def send_reasoning(self, msg: OutboundMessage) -> None:
         """Deliver a complete reasoning block.
 

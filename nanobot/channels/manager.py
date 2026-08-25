@@ -811,6 +811,13 @@ class ChannelManager:
                         continue
 
                 if isinstance(event, RetryWaitEvent):
+                    # Delivered like progress: a provider backoff otherwise
+                    # looks exactly like a wedged turn to a channel. The base
+                    # primitive is a no-op, so only channels that render waits
+                    # see them.
+                    channel = self.channels.get(msg.channel)
+                    if channel is not None and self._should_send_progress(msg.channel):
+                        await self._send_with_retry(channel, msg)
                     continue
 
                 if (
@@ -923,6 +930,8 @@ class ChannelManager:
                 event.file_edit_events,
                 msg.metadata,
             )
+        elif isinstance(event, RetryWaitEvent):
+            await channel.send_retry_wait(msg.chat_id, msg.content, msg.metadata)
         elif isinstance(event, StreamDeltaEvent):
             await ChannelManager._send_stream_event(channel, msg, event)
         elif isinstance(event, StreamEndEvent):

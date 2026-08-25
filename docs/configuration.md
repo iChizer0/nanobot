@@ -1620,7 +1620,7 @@ Global settings that apply to all channels. Configure under the `channels` secti
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `sendProgress` | `true` | Stream agent's text progress to the channel |
+| `sendProgress` | `true` | Stream agent's text progress to the channel. Also gates provider retry-backoff notices, which reach channels that override `send_retry_wait` (default no-op). |
 | `sendToolHints` | `true` | Stream tool-call hints (e.g. `read_file("…")`) |
 | `showReasoning` | `true` | Allow channels to surface model reasoning/thinking content (DeepSeek-R1 `reasoning_content`, Anthropic `thinking_blocks`, inline `<think>` tags). Reasoning flows as a dedicated stream with `_reasoning_delta` / `_reasoning_end` markers — channels override `send_reasoning_delta` / `send_reasoning_end` to render in-place updates. Even with `true`, channels without those overrides stay no-op silently. Currently surfaced on CLI and WebSocket/WebUI (italic shimmer header, auto-collapses after the stream ends); Telegram / Slack / Discord / Feishu / WeChat / Matrix / Mattermost keep the base no-op until their bubble UI is adapted. Independent of `sendProgress`. |
 | `sendMaxRetries` | `3` | Max delivery attempts per outbound message, including the initial send (0-10 configured, minimum 1 actual attempt) |

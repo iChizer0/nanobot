@@ -12,7 +12,9 @@ from nanobot.runtime_context import (
     WEBUI_QUOTE_METADATA,
     WEBUI_QUOTE_SOURCE,
     RuntimeContextBlock,
+    append_ephemeral_runtime_context,
     append_runtime_context,
+    drop_ephemeral_runtime_context,
     normalize_webui_quote,
     public_history_message,
     resolve_runtime_context,
@@ -168,3 +170,49 @@ def test_webui_preview_title_and_backfill_hide_runtime_context() -> None:
     event = _session_user_event("websocket:chat", persisted)
     assert event is not None
     assert event["text"] == "visible user text"
+
+
+def test_ephemeral_blocks_ride_the_request_and_leave_no_record() -> None:
+    blocks = [
+        RuntimeContextBlock(source="quote", content="durable excerpt"),
+        RuntimeContextBlock(source="voice", content="[Voice channel] contract", ephemeral=True),
+    ]
+
+    content, marker = append_runtime_context("hello", blocks)
+    content, ephemeral_marker = append_ephemeral_runtime_context(content, blocks)
+
+    # The model sees both, with the turn-scoped block last.
+    assert content == "hello\n\ndurable excerpt\n\n[Voice channel] contract"
+    assert marker is not None and marker["sources"] == ["quote"]
+    assert ephemeral_marker is not None and ephemeral_marker["sources"] == ["voice"]
+
+    # History keeps the durable half only, and the existing marker still
+    # describes it exactly, so display-time removal is unaffected.
+    persisted = drop_ephemeral_runtime_context(content, ephemeral_marker)
+    assert persisted == "hello\n\ndurable excerpt"
+    assert public_history_message(
+        {"role": "user", "content": persisted, RUNTIME_CONTEXT_HISTORY_META: marker}
+    )["content"] == "hello"
+
+
+def test_ephemeral_blocks_round_trip_through_multimodal_content() -> None:
+    image = {"type": "image_url", "image_url": {"url": "data:image/png;base64,x"}}
+    blocks = [RuntimeContextBlock(source="voice", content="spoken reply", ephemeral=True)]
+
+    content, marker = append_runtime_context([image], blocks)
+    assert marker is None  # nothing durable to record
+
+    content, ephemeral_marker = append_ephemeral_runtime_context(content, blocks)
+    assert content == [image, {"type": "text", "text": "spoken reply"}]
+    assert ephemeral_marker is not None
+
+    assert drop_ephemeral_runtime_context(content, ephemeral_marker) == [image]
+
+
+def test_dropping_ephemeral_context_leaves_edited_content_alone() -> None:
+    marker = {"version": 1, "sources": ["voice"], "suffix": "spoken reply"}
+
+    # A message that no longer ends with the recorded suffix is left intact
+    # rather than truncated at a guess.
+    assert drop_ephemeral_runtime_context("hello", marker) == "hello"
+    assert drop_ephemeral_runtime_context("spoken reply", marker) == ""

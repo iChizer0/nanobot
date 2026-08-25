@@ -693,6 +693,58 @@ def test_save_turn_persists_runtime_context_and_public_view_hides_it() -> None:
     assert public_history_message(session.messages[0])["content"] == "hello world"
 
 
+def test_early_persisted_user_row_excludes_ephemeral_runtime_context(tmp_path: Path) -> None:
+    loop = _make_full_loop(tmp_path)
+    session = loop.sessions.get_or_create("voice:local")
+
+    persisted = loop._persist_user_message_early(
+        InboundMessage(
+            channel="voice",
+            sender_id="user",
+            chat_id="local",
+            content="remind me at nine",
+        ),
+        session,
+        runtime_context_blocks=[
+            RuntimeContextBlock(source="quote", content="durable excerpt"),
+            RuntimeContextBlock(
+                source="voice",
+                content="[Voice channel] your reply is spoken aloud",
+                ephemeral=True,
+            ),
+        ],
+    )
+
+    assert persisted is True
+    assert session.messages[-1]["content"] == "remind me at nine\n\ndurable excerpt"
+
+
+def test_save_turn_keeps_ephemeral_runtime_context_out_of_history(tmp_path: Path) -> None:
+    """A channel's session-constant contract must not accumulate per user row."""
+    loop = _mk_loop()
+    session = Session(key="test:ephemeral-context")
+    durable = RuntimeContextBlock(source="quote", content="durable excerpt")
+    ephemeral = RuntimeContextBlock(
+        source="voice",
+        content="[Voice channel] your reply is spoken aloud",
+        ephemeral=True,
+    )
+
+    current = ContextBuilder(tmp_path).build_current_message(
+        "what did I ask?",
+        runtime_context_blocks=[durable, ephemeral],
+    )
+    # The model still sees it on this turn.
+    assert "[Voice channel] your reply is spoken aloud" in current["content"]
+
+    loop._save_turn(session, [current], skip=0)
+
+    stored = session.messages[0]
+    assert stored["content"] == "what did I ask?\n\ndurable excerpt"
+    assert stored[RUNTIME_CONTEXT_HISTORY_META]["sources"] == ["quote"]
+    assert public_history_message(stored)["content"] == "what did I ask?"
+
+
 def test_build_and_save_preserves_user_text_containing_goal_guidance_tag(tmp_path: Path) -> None:
     loop = _mk_loop()
     session = Session(key="test:user-guidance-literal")

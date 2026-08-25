@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 RUNTIME_CONTEXT_HISTORY_META = "_runtime_context"
 RUNTIME_CONTEXT_MESSAGE_META = "runtime_context"
+RUNTIME_CONTEXT_EPHEMERAL_META = "runtime_context_ephemeral"
 RUNTIME_CONTEXT_INPUT_META = "_runtime_context_blocks"
 RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
 RUNTIME_CONTEXT_END = "[/Runtime Context]"
@@ -26,10 +27,18 @@ class RuntimeContextBlock:
     """Provider-owned context appended verbatim to the current user content.
 
     Callers must bound and delimit content obtained from untrusted sources.
+
+    An ``ephemeral`` block rides only the request it was resolved for: it is
+    appended to the current message and never persisted, so session-constant
+    facts (a channel's delivery contract, the current clock) cost one copy per
+    turn instead of one copy per user row replayed for the rest of the session.
+    Blocks worth re-reading later — a quoted excerpt, a fact about that
+    specific turn — stay durable.
     """
 
     source: str
     content: str
+    ephemeral: bool = False
 
 
 def normalize_webui_quote(value: Any) -> str | None:
@@ -92,7 +101,13 @@ def normalize_runtime_context_blocks(result: RuntimeContextResult) -> list[Runti
         if not source:
             raise ValueError("runtime context block source must not be empty")
         if content:
-            blocks.append(RuntimeContextBlock(source=source, content=content))
+            blocks.append(
+                RuntimeContextBlock(
+                    source=source,
+                    content=content,
+                    ephemeral=block.ephemeral,
+                )
+            )
     return blocks
 
 
@@ -117,11 +132,11 @@ async def resolve_runtime_context(
     return blocks
 
 
-def append_runtime_context(
+def _append_blocks(
     content: Any,
     blocks: Sequence[RuntimeContextBlock],
 ) -> tuple[Any, dict[str, Any] | None]:
-    """Append blocks and return a durable marker for exact display-time removal."""
+    """Append rendered blocks and describe them for exact removal."""
     if not blocks:
         return content, None
 
@@ -143,6 +158,64 @@ def append_runtime_context(
         "sources": sources,
         "suffix": suffix,
     }
+
+
+def append_runtime_context(
+    content: Any,
+    blocks: Sequence[RuntimeContextBlock],
+) -> tuple[Any, dict[str, Any] | None]:
+    """Append blocks and return a durable marker for exact display-time removal.
+
+    Ephemeral blocks are skipped here and appended by
+    :func:`append_ephemeral_runtime_context` afterwards, so the durable suffix
+    keeps a fixed position that the marker can still describe exactly.
+    """
+    return _append_blocks(content, [block for block in blocks if not block.ephemeral])
+
+
+def append_ephemeral_runtime_context(
+    content: Any,
+    blocks: Sequence[RuntimeContextBlock],
+) -> tuple[Any, dict[str, Any] | None]:
+    """Append turn-scoped blocks to the request currently being built.
+
+    Returns a marker describing exactly what to remove again before the
+    message is persisted. Call this after :func:`append_runtime_context` so the
+    ephemeral text is the tail and the durable suffix stays where its own
+    marker says it is.
+    """
+    return _append_blocks(content, [block for block in blocks if block.ephemeral])
+
+
+def drop_ephemeral_runtime_context(
+    content: Any,
+    marker: Mapping[str, Any],
+) -> Any:
+    """Remove what :func:`append_ephemeral_runtime_context` added.
+
+    Applied on the way into session history: an ephemeral block belongs to one
+    request, never to the record of it.
+    """
+    kept: Any = content
+    if marker.get("version") != 1:
+        return kept
+
+    suffix = marker.get("suffix")
+    if isinstance(content, str) and isinstance(suffix, str) and suffix:
+        if content == suffix:
+            kept = ""
+        elif content.endswith("\n\n" + suffix):
+            kept = content[: -(len(suffix) + 2)]
+        return kept
+
+    expected = marker.get("blocks")
+    if isinstance(content, list) and isinstance(expected, list) and expected:
+        content_blocks = cast(list[Any], content)
+        expected_blocks = cast(list[Any], expected)
+        count = len(expected_blocks)
+        if content_blocks[-count:] == expected_blocks:
+            kept = content_blocks[:-count]
+    return kept
 
 
 def detach_runtime_context(

@@ -975,6 +975,67 @@ def test_model_request_merge_preserves_runtime_markers_with_media() -> None:
     ]
 
 
+def test_runner_injections_stay_distinct_and_persist_no_ephemeral_context() -> None:
+    """Injected rows stay separate, and none of them records turn-scoped context."""
+    from nanobot.agent.runner import AgentRunner
+    from nanobot.runtime_context import (
+        RUNTIME_CONTEXT_EPHEMERAL_META,
+        RUNTIME_CONTEXT_HISTORY_META,
+        RUNTIME_CONTEXT_MESSAGE_META,
+        RuntimeContextBlock,
+        append_ephemeral_runtime_context,
+        append_runtime_context,
+        drop_ephemeral_runtime_context,
+        public_history_message,
+    )
+
+    def _row(text: str, quote: str) -> dict:
+        blocks = [
+            RuntimeContextBlock(source="quote", content=quote),
+            RuntimeContextBlock(source="voice", content="[Voice channel] spoken", ephemeral=True),
+        ]
+        content, marker = append_runtime_context(text, blocks)
+        content, ephemeral_marker = append_ephemeral_runtime_context(content, blocks)
+        return {
+            "role": "user",
+            "content": content,
+            "_meta": {
+                RUNTIME_CONTEXT_MESSAGE_META: marker,
+                RUNTIME_CONTEXT_EPHEMERAL_META: ephemeral_marker,
+            },
+        }
+
+    messages: list[dict] = []
+    AgentRunner._append_injected_messages(
+        messages,
+        [_row("first", "quote one"), _row("also make it blue", "quote two")],
+    )
+
+    # The runner keeps injected transcript rows distinct; each carries its own
+    # runtime context, ephemeral part included.
+    assert len(messages) == 2
+    for row, text, quote in (
+        (messages[0], "first", "quote one"),
+        (messages[1], "also make it blue", "quote two"),
+    ):
+        content = row["content"]
+        assert quote in content
+        assert content.count("[Voice channel] spoken") == 1
+        assert content.endswith("[Voice channel] spoken")
+
+        persisted_content = drop_ephemeral_runtime_context(
+            content,
+            row["_meta"][RUNTIME_CONTEXT_EPHEMERAL_META],
+        )
+        assert "[Voice channel] spoken" not in persisted_content
+        persisted = {
+            "role": "user",
+            "content": persisted_content,
+            RUNTIME_CONTEXT_HISTORY_META: row["_meta"][RUNTIME_CONTEXT_MESSAGE_META],
+        }
+        assert public_history_message(persisted)["content"] == text
+
+
 @pytest.mark.asyncio
 async def test_injection_cycles_capped_at_max():
     """Injection cycles should be capped at _MAX_INJECTION_CYCLES."""

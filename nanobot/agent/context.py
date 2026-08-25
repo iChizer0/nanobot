@@ -20,8 +20,10 @@ from nanobot.bus.events import (
     InboundMessage,
 )
 from nanobot.runtime_context import (
+    RUNTIME_CONTEXT_EPHEMERAL_META,
     RUNTIME_CONTEXT_MESSAGE_META,
     RuntimeContextBlock,
+    append_ephemeral_runtime_context,
     append_runtime_context,
 )
 from nanobot.security.workspace_access import WorkspaceScopeResolver
@@ -324,11 +326,16 @@ class ContextBuilder:
             if skill_context is not None and skill_context not in blocks:
                 blocks.append(skill_context)
         merged, runtime_context_meta = append_runtime_context(content, blocks)
+        merged, ephemeral_meta = append_ephemeral_runtime_context(merged, blocks)
         current: dict[str, Any] = {"role": current_role, "content": merged}
-        if current_role == "user" and runtime_context_meta is not None:
-            current["_meta"] = {
-                RUNTIME_CONTEXT_MESSAGE_META: runtime_context_meta,
-            }
+        if current_role == "user":
+            internal_meta: dict[str, Any] = {}
+            if runtime_context_meta is not None:
+                internal_meta[RUNTIME_CONTEXT_MESSAGE_META] = runtime_context_meta
+            if ephemeral_meta is not None:
+                internal_meta[RUNTIME_CONTEXT_EPHEMERAL_META] = ephemeral_meta
+            if internal_meta:
+                current["_meta"] = internal_meta
         return current
 
     def build_user_content(

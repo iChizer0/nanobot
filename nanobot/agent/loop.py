@@ -57,11 +57,14 @@ from nanobot.llm_usage.context import source_from_request
 from nanobot.providers.base import LLMProvider, LLMUsage, ProviderConversationState
 from nanobot.providers.factory import ProviderSnapshot
 from nanobot.runtime_context import (
+    RUNTIME_CONTEXT_EPHEMERAL_META,
     RUNTIME_CONTEXT_HISTORY_META,
     RUNTIME_CONTEXT_MESSAGE_META,
     RuntimeContextBlock,
     RuntimeContextProvider,
+    append_ephemeral_runtime_context,
     append_runtime_context,
+    drop_ephemeral_runtime_context,
     resolve_runtime_context,
     runtime_context_blocks_from_metadata,
 )
@@ -1072,10 +1075,17 @@ class AgentLoop:
                         user_content,
                         blocks,
                     )
+                    row["content"], ephemeral_marker = append_ephemeral_runtime_context(
+                        row["content"],
+                        blocks,
+                    )
+                    row_meta: dict[str, Any] = {}
                     if runtime_marker is not None:
-                        row["_meta"] = {
-                            RUNTIME_CONTEXT_MESSAGE_META: runtime_marker,
-                        }
+                        row_meta[RUNTIME_CONTEXT_MESSAGE_META] = runtime_marker
+                    if ephemeral_marker is not None:
+                        row_meta[RUNTIME_CONTEXT_EPHEMERAL_META] = ephemeral_marker
+                    if row_meta:
+                        row["_meta"] = row_meta
                 if (
                     pending_msg.sender_id == "subagent"
                     and metadata.get("injected_event") == "subagent_result"
@@ -2368,6 +2378,18 @@ class AgentLoop:
                 if isinstance(internal_meta, dict)
                 else None
             )
+            ephemeral_context_meta = (
+                cast(dict[str, Any], internal_meta).get(
+                    RUNTIME_CONTEXT_EPHEMERAL_META
+                )
+                if isinstance(internal_meta, dict)
+                else None
+            )
+            if isinstance(ephemeral_context_meta, dict):
+                entry["content"] = drop_ephemeral_runtime_context(
+                    entry.get("content"),
+                    cast(dict[str, Any], ephemeral_context_meta),
+                )
             role, content = entry.get("role"), entry.get("content")
             if role == "assistant" and not content and not entry.get("tool_calls"):
                 continue  # skip empty assistant messages — they poison session context

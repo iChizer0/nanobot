@@ -412,6 +412,13 @@ class ToolsConfig(Base):
             "allow_local_preview_access",
         ),
     )  # allow WebUI Full Access shell checks against localhost services; legacy allowLocalPreviewAccess still reads
+    local_service_access_channels: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices(
+            "localServiceAccessChannels",
+            "local_service_access_channels",
+        ),
+    )  # channel names whose exec turns may reach localhost services, like the WebUI's Full Access
     webui_allow_remote_package_install: bool = Field(
         default=False,
         validation_alias=AliasChoices(

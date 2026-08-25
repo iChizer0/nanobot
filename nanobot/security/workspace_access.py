@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Collection
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from pathlib import Path
@@ -119,10 +120,11 @@ class WorkspaceScopeResolver:
     def sandbox_status(self) -> WorkspaceSandboxStatus:
         return self.default().sandbox_status
 
-    def default(self) -> WorkspaceScope:
+    def default(self, *, source_channel: str | None = None) -> WorkspaceScope:
         return default_workspace_scope(
             self.default_workspace,
             self.default_restrict_to_workspace,
+            source_channel=source_channel,
         )
 
     def for_turn(
@@ -133,7 +135,9 @@ class WorkspaceScopeResolver:
         session_metadata: Any,
     ) -> WorkspaceScope:
         if channel != self.scoped_channel:
-            return self.default()
+            # Channels other than the scoped one cannot pick a workspace, but
+            # the origin still decides policy such as loopback access.
+            return self.default(source_channel=channel)
         return resolve_effective_workspace_scope(
             message_metadata=message_metadata,
             session_metadata=session_metadata,
@@ -369,17 +373,25 @@ def current_tool_workspace(
     )
 
 
-def current_scope_allows_loopback(*, enabled: bool) -> bool:
-    """Return True when the current WebUI Full Access turn may touch loopback URLs."""
+def current_scope_allows_loopback(
+    *,
+    enabled: bool,
+    channels: Collection[str] = (),
+) -> bool:
+    """Return True when the current turn may touch loopback URLs.
+
+    A WebUI Full Access turn carries that permission implicitly. Any other
+    channel has to be named by the operator, because whoever is talking to a
+    chat channel is not necessarily whoever runs the services next to the
+    gateway.
+    """
 
     scope = current_workspace_scope()
-    return bool(
-        enabled
-        and scope is not None
-        and scope.source_channel == "websocket"
-        and scope.access_mode == "full"
-        and not scope.restrict_to_workspace
-    )
+    if scope is None or scope.access_mode != "full" or scope.restrict_to_workspace:
+        return False
+    if scope.source_channel == "websocket":
+        return enabled
+    return bool(scope.source_channel) and scope.source_channel in channels
 
 
 def _env_system_provider(environ: dict[str, str] | None = None) -> str | None:

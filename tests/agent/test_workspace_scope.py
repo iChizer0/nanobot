@@ -67,6 +67,22 @@ def test_workspace_scope_defaults_match_legacy_config(tmp_path: Path) -> None:
     assert restricted.restrict_to_workspace is True
 
 
+def test_turn_scope_records_the_origin_channel(tmp_path: Path) -> None:
+    """Policy that keys on the origin needs it recorded for every channel,
+    not only the one that may pick a workspace."""
+    resolver = WorkspaceScopeResolver(
+        default_workspace=tmp_path,
+        default_restrict_to_workspace=False,
+    )
+
+    voice = resolver.for_turn(channel="voice", message_metadata=None, session_metadata=None)
+    webui = resolver.for_turn(channel="websocket", message_metadata=None, session_metadata=None)
+
+    assert voice.source_channel == "voice"
+    assert voice.project_path == tmp_path.resolve()
+    assert webui.source_channel == "websocket"
+
+
 def test_workspace_scope_rejects_invalid_project_path(tmp_path: Path) -> None:
     with pytest.raises(WorkspaceScopeError, match="absolute"):
         validate_workspace_scope_payload(

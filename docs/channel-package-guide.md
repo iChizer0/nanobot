@@ -385,6 +385,7 @@ nanobot channels login <channel_name> --force  # re-authenticate
 | `send_reasoning_delta(chat_id, delta, metadata?, *, stream_id?)` | Optional hook for streamed model reasoning/thinking content. Default is no-op. |
 | `send_reasoning_end(chat_id, metadata?, *, stream_id?)` | Optional hook marking the end of a reasoning block. Default is no-op. |
 | `send_reasoning(msg)` | Optional one-shot reasoning fallback. Default translates to `send_reasoning_delta()` + `send_reasoning_end()`. |
+| `send_retry_wait(chat_id, content, metadata?)` | Optional hook for provider retry-backoff notices, repeated while the wait counts down. Default is no-op; gated by `sendProgress`. |
 
 ### Optional management contract
 

@@ -80,7 +80,10 @@ async def test_process_message_hands_complete_replay_to_runner(tmp_path: Path) -
         )
 
     assert result is not None
-    assert get_history.call_args.kwargs == {"extend_to_user": False}
+    assert get_history.call_args.kwargs == {
+        "extend_to_user": False,
+        "replay_reasoning": loop.replay_reasoning,
+    }
 
 
 @pytest.mark.asyncio

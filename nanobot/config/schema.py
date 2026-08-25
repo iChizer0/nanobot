@@ -129,6 +129,10 @@ class AgentDefaults(Base):
     max_tool_iterations: int = 200
     max_concurrent_subagents: int = Field(default=4, ge=1)
     max_tool_result_chars: int = 16_000
+    # Which past reasoning/thinking content is replayed to the model:
+    # "recent" keeps the most recent assistant turn (and any unfinished tool
+    # loop), "all" replays every stored block, "none" replays none.
+    replay_reasoning: Literal["recent", "all", "none"] = "recent"
     provider_retry_mode: Literal["standard", "persistent"] = "standard"
     tool_hint_max_length: int = Field(
         default=40,

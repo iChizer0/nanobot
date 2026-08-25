@@ -15,7 +15,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Collection, Generator, Protocol, TypedDict, cast
+from typing import Any, Callable, Collection, Generator, Literal, Protocol, TypedDict, cast
 from weakref import WeakValueDictionary
 
 from filelock import FileLock
@@ -112,6 +112,30 @@ def _sanitize_assistant_replay_text(content: str) -> str:
         and not _TOOL_CALL_ECHO_RE.match(line)
     ]
     return "\n".join(lines).strip()
+
+
+def _bound_reasoning_replay(
+    messages: list[dict[str, Any]],
+    *,
+    keep_last_turn: bool,
+) -> None:
+    """Drop replayed reasoning outside the most recent assistant turn.
+
+    Past-turn reasoning is token-heavy and providers generally advise against
+    resending it, but the turn still in flight needs its own thinking blocks
+    alongside the tool calls they belong to — so the boundary is the last user
+    message, which keeps an unfinished tool loop intact.
+    """
+    boundary = len(messages)
+    if keep_last_turn:
+        boundary = 0
+        for index in range(len(messages) - 1, -1, -1):
+            if messages[index].get("role") == "user":
+                boundary = index
+                break
+    for message in messages[:boundary]:
+        message.pop("reasoning_content", None)
+        message.pop("thinking_blocks", None)
 
 
 def _text_preview(content: object) -> str:
@@ -244,6 +268,7 @@ class Session:
         max_tokens: int = 0,
         extend_to_user: bool = False,
         include_runtime_context: bool = True,
+        replay_reasoning: Literal["recent", "all", "none"] = "all",
     ) -> list[dict[str, Any]]:
         """Return recent replayable messages for LLM input.
 
@@ -251,6 +276,10 @@ class Session:
         summary and resumes replay after its hidden boundary marker. The marker
         is not a user request and must not resume an old task on the next turn.
         A positive ``max_messages`` applies an additional caller-owned count limit.
+
+        ``replay_reasoning`` bounds how far back stored reasoning is resent;
+        it never touches the persisted record, which stays complete for
+        display and consolidation.
         """
         replayable = self.messages[self.last_archived:]
         if max_messages <= 0:
@@ -337,6 +366,9 @@ class Session:
                 if key in message:
                     entry[key] = message[key]
             out.append(entry)
+
+        if replay_reasoning != "all":
+            _bound_reasoning_replay(out, keep_last_turn=replay_reasoning == "recent")
 
         if max_tokens > 0 and out:
             kept: list[dict[str, Any]] = []

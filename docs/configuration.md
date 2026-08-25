@@ -2293,6 +2293,16 @@ When a session is idle for longer than a configured threshold, nanobot summarize
 
 `sessionTtlMinutes` remains accepted as a legacy alias for backward compatibility, but `idleCompactAfterMinutes` is the preferred config key going forward.
 
+### Reasoning replay
+
+Reasoning models store their thinking with each assistant turn. Replaying all
+of it competes with the conversation for the same replay budget, and providers
+generally do not need past-turn reasoning back.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `agents.defaults.replayReasoning` | `"recent"` | Which stored reasoning is resent to the model: `"recent"` keeps the most recent assistant turn — including a tool loop that has not finished, whose thinking blocks belong with its tool calls — `"all"` resends every stored block, `"none"` resends nothing. Only replay is affected; the session file keeps the complete record for display and consolidation. |
+
 How it works:
 1. **Idle detection**: On each idle tick (~1 s), checks whether an idle-session scan is due. By default, the full scan runs at most once per minute.
 2. **Background compaction**: The conversation so far is summarized for the next turn.

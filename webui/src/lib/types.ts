@@ -993,6 +993,8 @@ export interface NanobotFeatureInfo {
   capabilities?: string[];
   settings_visible?: boolean;
   webui?: string;
+  /** Icon for a channel package without a compiled UI contribution (https or data:image URI). */
+  logo_url?: string;
   type: "channel" | "feature" | string;
   enabled: boolean;
   running?: boolean;

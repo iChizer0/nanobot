@@ -17,6 +17,10 @@ if TYPE_CHECKING:
     from nanobot.channels.base import BaseChannel
 
 _CHANNEL_PACKAGE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+# A logo for channel packages without a compiled WebUI contribution: a remote image, or an
+# inline one that needs no hosting and no network (an <img> never runs scripts in an SVG).
+_LOGO_URL = re.compile(r"^(https://\S+|data:image/[A-Za-z0-9.+-]+;[^\s,]*,\S+)$")
+_LOGO_URL_MAX_LENGTH = 16 * 1024
 
 
 @dataclass(frozen=True)
@@ -25,7 +29,8 @@ class ChannelPlugin:
 
     ``runtime`` is an absolute ``module:attribute`` target. Keeping it as an
     import string lets discovery inspect metadata without importing optional
-    platform SDKs.
+    platform SDKs. ``logo_url`` gives a package installed from outside this tree
+    (no ``webui`` contribution compiled into the bundle) an icon in Settings.
     """
 
     name: str
@@ -39,6 +44,7 @@ class ChannelPlugin:
     settings_visible: bool = True
     capabilities: frozenset[str] = frozenset()
     webui: str | None = None
+    logo_url: str | None = None
 
     def __post_init__(self) -> None:
         if _CHANNEL_PACKAGE_NAME.fullmatch(self.name) is None:
@@ -70,6 +76,17 @@ class ChannelPlugin:
             if webui.startswith("/") or ".." in webui.split("/"):
                 raise ValueError("channel plugin webui entry must stay inside its package")
             object.__setattr__(self, "webui", webui)
+        if self.logo_url is not None:
+            logo_url = self.logo_url.strip()
+            if not _LOGO_URL.match(logo_url):
+                raise ValueError(
+                    "channel plugin logo_url must be an https:// URL or a data:image/ URI"
+                )
+            if len(logo_url) > _LOGO_URL_MAX_LENGTH:
+                raise ValueError(
+                    f"channel plugin logo_url must be at most {_LOGO_URL_MAX_LENGTH} characters"
+                )
+            object.__setattr__(self, "logo_url", logo_url)
 
     def load_channel_class(self) -> type[BaseChannel]:
         """Resolve and validate the runtime class only when the channel is needed."""

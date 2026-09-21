@@ -804,6 +804,49 @@ def test_discover_plugins_skips_names_outside_enabled_set():
     assert loaded == []
 
 
+def test_channel_manifest_logo_url_is_https_or_inline_image():
+    """An out-of-tree package has no compiled WebUI contribution, so its icon rides the
+    manifest: a remote https image or an inline data:image URI, nothing the browser could
+    execute or fetch in the clear."""
+    inline = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
+    plugin = ChannelPlugin(
+        name="demo",
+        display_name="Demo",
+        runtime="demo.runtime:DemoChannel",
+        logo_url=f"  {inline}  ",
+    )
+    assert plugin.logo_url == inline
+    assert ChannelPlugin(
+        name="demo",
+        display_name="Demo",
+        runtime="demo.runtime:DemoChannel",
+        logo_url="https://demo.example/logo.png",
+    ).logo_url == "https://demo.example/logo.png"
+    assert ChannelPlugin(name="demo", display_name="Demo", runtime="demo.runtime:X").logo_url is None
+    for rejected in (
+        "http://demo.example/logo.png",
+        "javascript:alert(1)",
+        "data:text/html,<script>",
+        "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>",
+        "/static/logo.svg",
+        "",
+    ):
+        with pytest.raises(ValueError, match="logo_url"):
+            ChannelPlugin(
+                name="demo",
+                display_name="Demo",
+                runtime="demo.runtime:DemoChannel",
+                logo_url=rejected,
+            )
+    with pytest.raises(ValueError, match="at most"):
+        ChannelPlugin(
+            name="demo",
+            display_name="Demo",
+            runtime="demo.runtime:DemoChannel",
+            logo_url="data:image/png;base64," + "A" * (16 * 1024),
+        )
+
+
 def test_channel_manifest_rejects_invalid_dependency_metadata():
     with pytest.raises(TypeError, match="tuple of requirements"):
         ChannelPlugin(
@@ -2131,6 +2174,7 @@ def test_package_manifest_metadata_drives_optional_feature_payload(monkeypatch):
         default_enabled=True,
         capabilities=frozenset({"custom_ui"}),
         webui="webui/entry.tsx",
+        logo_url="https://demo.example/logo.svg",
     )
     config = Config.model_validate({"channels": {"demo": {"enabled": False}}})
     checked_extras: list[tuple[str, list[str] | None]] = []
@@ -2154,6 +2198,7 @@ def test_package_manifest_metadata_drives_optional_feature_payload(monkeypatch):
     assert demo["display_name"] == "Demo Chat"
     assert demo["capabilities"] == ["custom_ui"]
     assert demo["webui"] == "webui/entry.tsx"
+    assert demo["logo_url"] == "https://demo.example/logo.svg"
 
 
 def test_optional_features_payload_reflects_saved_channel_config(monkeypatch):

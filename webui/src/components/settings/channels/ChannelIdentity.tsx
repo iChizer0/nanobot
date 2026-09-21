@@ -147,14 +147,19 @@ export function ChannelLogo({
     ?? channelUiPresentation(feature.name);
   const initials = presentation?.initials ?? feature.display_name.slice(0, 2).toUpperCase();
   const Icon = presentation?.icon;
+  // A compiled contribution owns the tile outright; the manifest's logo fills the gap
+  // for a package without one.
+  const primaryLogoUrl = presentation ? presentation.logoUrl : feature.logo_url;
   const logoUrls = useMemo(() => {
-    const fallbackUrls = logoFallbackUrls(presentation?.logoFallbackUrl ?? presentation?.logoUrl);
-    return presentation?.logoUrl && presentation.logoFallbackUrl
-      ? [...new Set([presentation.logoUrl, ...fallbackUrls])]
+    const fallbackUrls = logoFallbackUrls(presentation?.logoFallbackUrl ?? primaryLogoUrl);
+    return primaryLogoUrl && presentation?.logoFallbackUrl
+      ? [...new Set([primaryLogoUrl, ...fallbackUrls])]
       : fallbackUrls;
-  }, [presentation?.logoUrl, presentation?.logoFallbackUrl]);
+  }, [primaryLogoUrl, presentation?.logoFallbackUrl]);
   const { logoUrl, logoLoaded, onLogoError, onLogoLoad } = useLogoFallback(logoUrls);
-  const showRemoteLogo = showBrandLogos && Boolean(logoUrl);
+  // The brand-logo preference exists to avoid fetching third-party assets; an inline
+  // data: image fetches nothing.
+  const showRemoteLogo = Boolean(logoUrl) && (showBrandLogos || logoUrl!.startsWith("data:"));
   const showLoadedLogo = showRemoteLogo && logoLoaded;
   const isLogoTile = presentation?.logoLayout === "tile" && logoUrl === presentation.logoUrl;
 

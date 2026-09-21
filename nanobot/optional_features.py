@@ -460,6 +460,8 @@ def optional_features_payload(
             feature["settings_visible"] = channel_plugin.settings_visible
             if channel_plugin.webui is not None:
                 feature["webui"] = channel_plugin.webui
+            if channel_plugin.logo_url is not None:
+                feature["logo_url"] = channel_plugin.logo_url
 
         if not is_channel:
             feature.update({

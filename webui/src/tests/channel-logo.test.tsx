@@ -108,6 +108,38 @@ describe("channel logos", () => {
     expect(icon).toHaveClass("bg-white");
   });
 
+  it("draws a manifest logo_url for a channel package without a compiled contribution", () => {
+    const inline = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=";
+    const voice = { ...feature("printer"), display_name: "Printer", logo_url: inline };
+    expect(channelUiPresentation("printer")).toBeUndefined();
+
+    // An inline image fetches nothing, so the brand-logo preference does not hide it.
+    const { container, rerender } = render(<ChannelLogo feature={voice} showBrandLogos={false} />);
+    const icon = container.firstElementChild!;
+    const image = icon.querySelector("img")!;
+    expectFootprint(icon);
+    expect(image).toHaveAttribute("src", inline);
+    expect(icon).toHaveTextContent("PR");
+    fireEvent.load(image);
+    expect(icon).toHaveClass("bg-white");
+    expect(image).toHaveClass("h-6", "w-6", "opacity-100");
+    expect(icon.querySelector("span")).toHaveClass("opacity-0");
+
+    // A remote one is a third-party fetch and follows the preference like any brand logo.
+    const remote = { ...voice, logo_url: "https://printer.example/logo.svg" };
+    rerender(<ChannelLogo feature={remote} showBrandLogos={false} />);
+    expect(icon.querySelector("img")).toBeNull();
+    expect(icon).toHaveClass("bg-muted");
+    rerender(<ChannelLogo feature={remote} showBrandLogos />);
+    expect(icon.querySelector("img")).toHaveAttribute("src", "https://printer.example/logo.svg");
+
+    // A compiled contribution owns the tile: its icon draws and the manifest logo is ignored.
+    const email = { ...feature("email"), logo_url: inline };
+    rerender(<ChannelLogo feature={email} showBrandLogos={false} />);
+    expect(container.querySelector("svg.lucide-mail")).not.toBeNull();
+    expect(container.querySelector("img")).toBeNull();
+  });
+
   it("uses a generic envelope for Email without requesting a vendor logo", () => {
     const { container } = render(<ChannelLogo feature={feature("email")} showBrandLogos />);
     expectFootprint(container.firstElementChild!);

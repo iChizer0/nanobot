@@ -1,0 +1,30 @@
+{
+  "setup": {},
+  "custom": {
+    "description": "Talk to nanobot through a microphone and speaker on this machine, or through a realtime speech-to-speech provider.",
+    "invalidJson": "Not a JSON object.",
+    "advancedHint": "The pending edits as the channels.voice keys they set. Paste a whole section or a patch here to import it, every key in the schema is accepted.",
+    "advancedRows": "The less common rows and sections open in place below, shaded.",
+    "discard": "Discard pending changes",
+    "reset": "Reset to defaults",
+    "resolved": "Resolved setup",
+    "appliesOnStart": "Pending changes apply when the channel starts.",
+    "models": "Models",
+    "applyRestart": "Apply and restart",
+    "applyFetch": "Fetch {{size}} and start",
+    "fetching": "Fetching {{key}}",
+    "customModel": "Custom",
+    "installed": "installed",
+    "unknownModel": "{{key}} is not in the model index. Fetch it by hand or pick a listed model.",
+    "planSummary": "Apply downloads and removes the models above. {{free}} free.",
+    "planSummaryNoFree": "Apply downloads and removes the models above.",
+    "acceptFirst": "Accept the notices above to apply.",
+    "indexOffline": "The model index could not be refreshed. The choices are the last cached list.",
+    "applyStart": "Apply and start",
+    "applyFetchRestart": "Fetch {{size}} and restart",
+    "retry": "Retry",
+    "configImport": "Config import",
+    "build": "Build",
+    "license": "License: {{license}}."
+  }
+}

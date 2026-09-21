@@ -1,0 +1,30 @@
+{
+  "setup": {},
+  "custom": {
+    "description": "通过本机的麦克风和扬声器与 nanobot 对话，或接入实时语音对话服务。",
+    "invalidJson": "不是 JSON 对象。",
+    "advancedHint": "待应用的编辑对应的 channels.voice 键。可在此粘贴整个配置段或局部补丁以导入，接受 schema 中的所有键。",
+    "advancedRows": "不常用的行与配置段会在下方原位展开，并以底色标出。",
+    "discard": "放弃待应用的更改",
+    "reset": "重置为默认值",
+    "resolved": "解析后的配置",
+    "appliesOnStart": "待应用的更改会在频道启动时生效。",
+    "models": "模型",
+    "applyRestart": "应用并重启",
+    "applyFetch": "下载 {{size}} 并启动",
+    "fetching": "正在下载 {{key}}",
+    "customModel": "自定义",
+    "installed": "已安装",
+    "unknownModel": "{{key}} 不在模型索引中。请手动下载，或选择列出的模型。",
+    "planSummary": "应用会下载并删除上面列出的模型。剩余空间 {{free}}。",
+    "planSummaryNoFree": "应用会下载并删除上面列出的模型。",
+    "acceptFirst": "接受上方的声明后才能应用。",
+    "indexOffline": "模型索引无法刷新。选项来自上次缓存的列表。",
+    "applyStart": "应用并启动",
+    "applyFetchRestart": "下载 {{size}} 并重启",
+    "retry": "重试",
+    "configImport": "配置导入",
+    "build": "构建",
+    "license": "许可证：{{license}}。"
+  }
+}

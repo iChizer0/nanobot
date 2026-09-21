@@ -1,0 +1,30 @@
+{
+  "setup": {},
+  "custom": {
+    "description": "Parlez à nanobot via le micro et le haut-parleur de cette machine, ou via un fournisseur de conversation vocale en temps réel.",
+    "invalidJson": "Ce n'est pas un objet JSON.",
+    "advancedHint": "Les modifications en attente sous forme de clés channels.voice. Collez ici une section entière ou un correctif pour l'importer, toute clé du schéma est acceptée.",
+    "advancedRows": "Les lignes et sections moins courantes s'ouvrent à leur place ci-dessous, sur fond grisé.",
+    "discard": "Abandonner les modifications en attente",
+    "reset": "Rétablir les valeurs par défaut",
+    "resolved": "Configuration résolue",
+    "appliesOnStart": "Les modifications en attente s'appliquent au démarrage du canal.",
+    "models": "Modèles",
+    "applyRestart": "Appliquer et redémarrer",
+    "applyFetch": "Télécharger {{size}} et démarrer",
+    "fetching": "Téléchargement de {{key}}",
+    "customModel": "Personnalisé",
+    "installed": "installé",
+    "unknownModel": "{{key}} n'est pas dans l'index des modèles. Téléchargez-le à la main ou choisissez un modèle de la liste.",
+    "planSummary": "Appliquer télécharge et supprime les modèles ci-dessus. {{free}} libres.",
+    "planSummaryNoFree": "Appliquer télécharge et supprime les modèles ci-dessus.",
+    "acceptFirst": "Acceptez les avis ci-dessus pour appliquer.",
+    "indexOffline": "L'index des modèles n'a pas pu être actualisé. Les choix viennent de la dernière liste en cache.",
+    "applyStart": "Appliquer et démarrer",
+    "applyFetchRestart": "Télécharger {{size}} et redémarrer",
+    "retry": "Réessayer",
+    "configImport": "Import de configuration",
+    "build": "Version",
+    "license": "Licence : {{license}}."
+  }
+}

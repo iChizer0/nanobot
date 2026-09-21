@@ -1,0 +1,30 @@
+{
+  "setup": {},
+  "custom": {
+    "description": "Fale com o nanobot pelo microfone e alto-falante desta máquina, ou por um provedor de voz para voz em tempo real.",
+    "invalidJson": "Não é um objeto JSON.",
+    "advancedHint": "As edições pendentes como as chaves channels.voice que definem. Cole aqui uma seção inteira ou um patch para importá-lo, qualquer chave do esquema é aceita.",
+    "advancedRows": "As linhas e seções menos comuns abrem no lugar, abaixo, sombreadas.",
+    "discard": "Descartar alterações pendentes",
+    "reset": "Restaurar padrões",
+    "resolved": "Configuração resolvida",
+    "appliesOnStart": "As alterações pendentes são aplicadas quando o canal inicia.",
+    "models": "Modelos",
+    "applyRestart": "Aplicar e reiniciar",
+    "applyFetch": "Baixar {{size}} e iniciar",
+    "fetching": "Baixando {{key}}",
+    "customModel": "Personalizado",
+    "installed": "instalado",
+    "unknownModel": "{{key}} não está no índice de modelos. Baixe manualmente ou escolha um modelo da lista.",
+    "planSummary": "Aplicar baixa e remove os modelos acima. {{free}} livres.",
+    "planSummaryNoFree": "Aplicar baixa e remove os modelos acima.",
+    "acceptFirst": "Aceite os avisos acima para aplicar.",
+    "indexOffline": "Não foi possível atualizar o índice de modelos. As opções são a última lista em cache.",
+    "applyStart": "Aplicar e iniciar",
+    "applyFetchRestart": "Baixar {{size}} e reiniciar",
+    "retry": "Tentar novamente",
+    "configImport": "Importar configuração",
+    "build": "Versão",
+    "license": "Licença: {{license}}."
+  }
+}

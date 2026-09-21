@@ -1,0 +1,30 @@
+{
+  "setup": {},
+  "custom": {
+    "description": "Trò chuyện với nanobot qua micrô và loa trên máy này, hoặc qua nhà cung cấp giọng nói thời gian thực.",
+    "invalidJson": "Không phải là một đối tượng JSON.",
+    "advancedHint": "Các chỉnh sửa đang chờ dưới dạng các khóa channels.voice. Dán cả phần cấu hình hoặc một bản vá vào đây để nhập, mọi khóa trong schema đều được chấp nhận.",
+    "advancedRows": "Các hàng và phần ít dùng mở ra ngay tại chỗ bên dưới, có nền tô bóng.",
+    "discard": "Bỏ thay đổi đang chờ",
+    "reset": "Đặt lại về mặc định",
+    "resolved": "Cấu hình đã phân giải",
+    "appliesOnStart": "Thay đổi đang chờ sẽ được áp dụng khi kênh khởi động.",
+    "models": "Mô hình",
+    "applyRestart": "Áp dụng và khởi động lại",
+    "applyFetch": "Tải {{size}} và khởi động",
+    "fetching": "Đang tải {{key}}",
+    "customModel": "Tùy chỉnh",
+    "installed": "đã cài",
+    "unknownModel": "{{key}} không có trong chỉ mục mô hình. Hãy tải thủ công hoặc chọn một mô hình trong danh sách.",
+    "planSummary": "Áp dụng sẽ tải và xóa các mô hình ở trên. Còn trống {{free}}.",
+    "planSummaryNoFree": "Áp dụng sẽ tải và xóa các mô hình ở trên.",
+    "acceptFirst": "Chấp nhận các thông báo ở trên để áp dụng.",
+    "indexOffline": "Không thể làm mới chỉ mục mô hình. Các lựa chọn là danh sách đã lưu lần trước.",
+    "applyStart": "Áp dụng và khởi động",
+    "applyFetchRestart": "Tải {{size}} và khởi động lại",
+    "retry": "Thử lại",
+    "configImport": "Nhập cấu hình",
+    "build": "Bản dựng",
+    "license": "Giấy phép: {{license}}."
+  }
+}

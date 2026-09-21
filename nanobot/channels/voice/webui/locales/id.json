@@ -1,0 +1,30 @@
+{
+  "setup": {},
+  "custom": {
+    "description": "Bicara dengan nanobot melalui mikrofon dan speaker di mesin ini, atau melalui penyedia suara-ke-suara realtime.",
+    "invalidJson": "Bukan objek JSON.",
+    "advancedHint": "Suntingan tertunda sebagai kunci channels.voice yang ditetapkannya. Tempel seluruh bagian atau patch di sini untuk mengimpornya, semua kunci dalam skema diterima.",
+    "advancedRows": "Baris dan bagian yang jarang dipakai terbuka di tempatnya di bawah, dengan latar berbayang.",
+    "discard": "Buang perubahan tertunda",
+    "reset": "Setel ulang ke bawaan",
+    "resolved": "Pengaturan yang diterapkan",
+    "appliesOnStart": "Perubahan tertunda diterapkan saat saluran dimulai.",
+    "models": "Model",
+    "applyRestart": "Terapkan dan mulai ulang",
+    "applyFetch": "Unduh {{size}} dan mulai",
+    "fetching": "Mengunduh {{key}}",
+    "customModel": "Kustom",
+    "installed": "terpasang",
+    "unknownModel": "{{key}} tidak ada di indeks model. Unduh secara manual atau pilih model dari daftar.",
+    "planSummary": "Terapkan mengunduh dan menghapus model di atas. Tersisa {{free}}.",
+    "planSummaryNoFree": "Terapkan mengunduh dan menghapus model di atas.",
+    "acceptFirst": "Setujui pemberitahuan di atas untuk menerapkan.",
+    "indexOffline": "Indeks model tidak dapat diperbarui. Pilihan berasal dari daftar cache terakhir.",
+    "applyStart": "Terapkan dan mulai",
+    "applyFetchRestart": "Unduh {{size}} dan mulai ulang",
+    "retry": "Coba lagi",
+    "configImport": "Impor konfigurasi",
+    "build": "Versi",
+    "license": "Lisensi: {{license}}."
+  }
+}

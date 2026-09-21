@@ -1,0 +1,30 @@
+{
+  "setup": {},
+  "custom": {
+    "description": "透過本機的麥克風與喇叭和 nanobot 對話，或接入即時語音對話服務。",
+    "invalidJson": "不是 JSON 物件。",
+    "advancedHint": "待套用的編輯對應的 channels.voice 鍵。可在此貼上整個設定段或局部補丁以匯入，接受 schema 中的所有鍵。",
+    "advancedRows": "不常用的列與設定段會在下方原位展開，並以底色標出。",
+    "discard": "捨棄待套用的變更",
+    "reset": "重設為預設值",
+    "resolved": "解析後的設定",
+    "appliesOnStart": "待套用的變更會在頻道啟動時生效。",
+    "models": "模型",
+    "applyRestart": "套用並重新啟動",
+    "applyFetch": "下載 {{size}} 並啟動",
+    "fetching": "正在下載 {{key}}",
+    "customModel": "自訂",
+    "installed": "已安裝",
+    "unknownModel": "{{key}} 不在模型索引中。請手動下載，或選擇列出的模型。",
+    "planSummary": "套用會下載並移除上面列出的模型。剩餘空間 {{free}}。",
+    "planSummaryNoFree": "套用會下載並移除上面列出的模型。",
+    "acceptFirst": "接受上方的聲明後才能套用。",
+    "indexOffline": "模型索引無法更新。選項來自上次快取的清單。",
+    "applyStart": "套用並啟動",
+    "applyFetchRestart": "下載 {{size}} 並重新啟動",
+    "retry": "重試",
+    "configImport": "設定匯入",
+    "build": "建置",
+    "license": "授權：{{license}}。"
+  }
+}

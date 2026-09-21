@@ -1,0 +1,30 @@
+{
+  "setup": {},
+  "custom": {
+    "description": "このマシンのマイクとスピーカー、またはリアルタイム音声対話プロバイダーを通じて nanobot と話します。",
+    "invalidJson": "JSON オブジェクトではありません。",
+    "advancedHint": "保留中の編集を channels.voice のキーとして表示します。セクション全体またはパッチをここに貼り付けてインポートでき、スキーマのすべてのキーを受け付けます。",
+    "advancedRows": "あまり使わない行やセクションは、下の元の位置に網掛けで展開されます。",
+    "discard": "保留中の変更を破棄",
+    "reset": "既定値にリセット",
+    "resolved": "解決された設定",
+    "appliesOnStart": "保留中の変更はチャンネルの起動時に適用されます。",
+    "models": "モデル",
+    "applyRestart": "適用して再起動",
+    "applyFetch": "{{size}} をダウンロードして開始",
+    "fetching": "{{key}} をダウンロード中",
+    "customModel": "カスタム",
+    "installed": "インストール済み",
+    "unknownModel": "{{key}} はモデルインデックスにありません。手動で取得するか、一覧のモデルを選んでください。",
+    "planSummary": "適用すると、上の一覧のモデルをダウンロードおよび削除します。空き {{free}}。",
+    "planSummaryNoFree": "適用すると、上の一覧のモデルをダウンロードおよび削除します。",
+    "acceptFirst": "適用するには上の注意事項に同意してください。",
+    "indexOffline": "モデルインデックスを更新できませんでした。選択肢は前回キャッシュした一覧です。",
+    "applyStart": "適用して開始",
+    "applyFetchRestart": "{{size}} をダウンロードして再起動",
+    "retry": "再試行",
+    "configImport": "設定のインポート",
+    "build": "ビルド",
+    "license": "ライセンス: {{license}}。"
+  }
+}

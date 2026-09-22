@@ -74,6 +74,15 @@ TRANSCRIPTION_PROVIDERS: tuple[TranscriptionProviderSpec, ...] = (
         default_model="universal-3-pro,universal-2",
         adapter="nanobot.providers.transcription:AssemblyAITranscriptionProvider",
     ),
+    # Any OpenAI-compatible /v1/audio/transcriptions server, reached through the same
+    # `providers.custom` entry chat already uses for one: a self-hosted whisper, or a
+    # channel that serves its on-device engine. It has no default endpoint, so the
+    # provider entry's apiBase names it.
+    TranscriptionProviderSpec(
+        name="custom",
+        default_model="whisper-1",
+        adapter="nanobot.providers.transcription:OpenAITranscriptionProvider",
+    ),
     TranscriptionProviderSpec(
         name="siliconflow",
         default_model="FunAudioLLM/SenseVoiceSmall",

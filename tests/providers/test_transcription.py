@@ -265,6 +265,25 @@ def test_transcription_registry_lists_providers_and_aliases() -> None:
     assert resolve_transcription_provider("mimo").name == "xiaomi_mimo"
 
 
+def test_resolver_supports_a_custom_openai_compatible_transcription_server() -> None:
+    """`providers.custom` is chat's "any OpenAI-compatible endpoint"; transcription reaches
+    a self-hosted one (or a channel serving its own engine) through the same entry, so the
+    picker needs no per-server registry entry."""
+    config = Config()
+    config.transcription.provider = "custom"
+    config.providers.custom.api_key = "local-key"
+    config.providers.custom.api_base = "http://127.0.0.1:8035/v1"
+
+    resolved = resolve_transcription_config(config)
+
+    assert resolved.provider == "custom"
+    assert resolved.model == "whisper-1"  # the server names its own; this is the OpenAI id
+    assert resolved.api_key == "local-key"
+    assert resolved.api_base == "http://127.0.0.1:8035/v1"
+    assert resolved.configured  # a keyless server still needs a key here: `configured` gates
+    assert get_transcription_provider("custom").load_adapter() is OpenAITranscriptionProvider
+
+
 def test_resolver_supports_assemblyai_provider_config() -> None:
     config = Config()
     config.transcription.provider = "assemblyai"

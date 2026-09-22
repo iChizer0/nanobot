@@ -59,7 +59,6 @@ class SystemSettingsOperations:
     mcp_presets_action: SettingsOperation
     reload_mcp: SettingsOperation
     mcp_runtime_status: Callable[[], Mapping[str, str]] | None
-    check_for_update: SettingsOperation
     channel_feature_action: SettingsOperation | None = None
     channel_runtime_status: Callable[[], dict[str, Any]] | None = None
 
@@ -474,8 +473,6 @@ class SystemSettingsHandler:
                 action.removeprefix("mcp-"),
                 operations,
             )
-        if action == "version-check":
-            return await self._version_check(operations)
         return SettingsRouteResult.failure(404, "unknown settings action")
 
     async def _cli_apps(
@@ -1012,13 +1009,3 @@ class SystemSettingsHandler:
             restart_section="runtime" if action is not None else None,
         )
 
-    async def _version_check(
-        self,
-        operations: SystemSettingsOperations,
-    ) -> SettingsRouteResult:
-        try:
-            update_info = await asyncio.to_thread(operations.check_for_update)
-        except Exception:
-            self.logger.exception("version check failed")
-            return SettingsRouteResult.failure(500, "version check failed")
-        return SettingsRouteResult.success({"updateAvailable": update_info})

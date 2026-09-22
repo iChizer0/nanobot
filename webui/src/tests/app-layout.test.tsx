@@ -2739,7 +2739,7 @@ describe("App layout", () => {
     fireEvent.click(within(nav).getByRole("button", { name: "Capabilities", exact: true }));
     expect(screen.getByRole("switch", { name: "Image generation" })).toBeInTheDocument();
     fireEvent.click(within(nav).getByRole("button", { name: "About", exact: true }));
-    expect(await screen.findByRole("button", { name: "Check for updates" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Source code" })).toBeInTheDocument();
   });
 
   it("restores the settings section from the URL hash after a page reload", async () => {

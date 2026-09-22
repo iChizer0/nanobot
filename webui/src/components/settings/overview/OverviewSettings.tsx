@@ -1,16 +1,13 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { type Dispatch, type SetStateAction } from "react";
 import {
-  ArrowUpCircle,
   Bot,
   BookOpen,
   MessageCircle,
-  Check,
   ChevronRight,
   ExternalLink,
   Globe2,
   Github,
   ImageIcon,
-  Loader2,
   Mic,
   type LucideIcon,
 } from "lucide-react";
@@ -28,10 +25,8 @@ import {
 } from "@/components/settings/shared/SettingsControls";
 import { TokenUsageCard } from "@/components/settings/TokenUsageCard";
 import { ToggleButton } from "@/components/settings/ToggleButton";
-import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useLogoFallback } from "@/hooks/useLogoFallback";
-import { checkVersion } from "@/lib/api";
 import type {
   FileEditDisplayMode,
   LocalActivityMode,
@@ -40,7 +35,6 @@ import type {
 import { providerBrand, providerDisplayLabel } from "@/lib/provider-brand";
 import type { SettingsPayload } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { useClient } from "@/providers/ClientProvider";
 
 export function OverviewSettings({
   settings,
@@ -147,7 +141,7 @@ export function AboutSettings({ currentVersion }: { currentVersion?: string }) {
       <div className="flex flex-col items-center gap-4 py-6 text-center">
         <img src="/brand/nanobot_mark.svg" alt="" className="h-16 w-16 select-none" draggable={false} />
         <h1><img src="/brand/nanobot_wordmark.svg" alt="nanobot" className="h-auto w-40 select-none dark:brightness-150" draggable={false} /></h1>
-        <VersionCheckRow currentVersion={currentVersion} />
+        <VersionRow currentVersion={currentVersion} />
       </div>
       <SettingsGroup>
         {links.map(({ key, icon: Icon, href }) => (
@@ -166,39 +160,14 @@ export function AboutSettings({ currentVersion }: { currentVersion?: string }) {
   );
 }
 
-function VersionCheckRow({ currentVersion }: { currentVersion?: string }) {
+/**
+ * The build's version. The "Check for updates" button that sat here queried PyPI for
+ * nanobot-ai and pointed at a release that would replace this modified build, so it is
+ * removed while we run our own; `git revert` brings it and its route back.
+ */
+function VersionRow({ currentVersion }: { currentVersion?: string }) {
   const { t } = useTranslation();
   const tx = (key: string, fallback: string) => t(key, { defaultValue: fallback });
-  const { token } = useClient();
-  const [checking, setChecking] = useState(false);
-  const [result, setResult] = useState<
-    | { type: "up-to-date" }
-    | { type: "update"; latestVersion: string; pypiUrl?: string }
-    | { type: "error"; message: string }
-    | null
-  >(null);
-
-  const handleCheck = async () => {
-    setChecking(true);
-    setResult(null);
-    try {
-      const res = await checkVersion(token);
-      if (res.updateAvailable) {
-        setResult({
-          type: "update",
-          latestVersion: res.updateAvailable.latestVersion,
-          pypiUrl: res.updateAvailable.pypiUrl,
-        });
-      } else {
-        setResult({ type: "up-to-date" });
-      }
-    } catch (err) {
-      setResult({ type: "error", message: (err as Error).message });
-    } finally {
-      setChecking(false);
-    }
-  };
-
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="min-w-0">
@@ -208,53 +177,6 @@ function VersionCheckRow({ currentVersion }: { currentVersion?: string }) {
         <div className="mt-0.5 text-[12px] leading-5 text-muted-foreground">
           {currentVersion ? `v${currentVersion}` : "nanobot"}
         </div>
-      </div>
-      <div className="flex shrink-0 flex-col items-center gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => void handleCheck()}
-          disabled={checking}
-          className="rounded-full"
-        >
-          {checking ? (
-            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />
-          ) : (
-            <ArrowUpCircle className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-          )}
-          {checking
-            ? tx("settings.about.checking", "Checking...")
-            : tx("settings.about.checkForUpdates", "Check for updates")}
-        </Button>
-        {result?.type === "up-to-date" ? (
-          <span className="inline-flex items-center gap-1.5 text-[12px] text-emerald-600 dark:text-emerald-300">
-            <Check className="h-3 w-3" aria-hidden />
-            {tx("settings.about.upToDate", "You're up to date")}
-          </span>
-        ) : null}
-        {result?.type === "update" ? (
-          <span className="inline-flex items-center gap-1.5 text-[12px] text-blue-600 dark:text-blue-300">
-            <ArrowUpCircle className="h-3 w-3" aria-hidden />
-            {t("settings.about.updateAvailable", {
-              defaultValue: "Update available v{{version}}",
-              version: result.latestVersion,
-            })}
-            {result.pypiUrl ? (
-              <a
-                href={result.pypiUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-0.5 underline-offset-2 hover:underline"
-              >
-                PyPI
-                <ExternalLink className="h-2.5 w-2.5" aria-hidden />
-              </a>
-            ) : null}
-          </span>
-        ) : null}
-        {result?.type === "error" ? (
-          <span className="text-[12px] text-destructive">{result.message}</span>
-        ) : null}
       </div>
     </div>
   );

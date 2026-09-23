@@ -452,18 +452,21 @@ it("opens on the form first and follows the index reload behind the plan", async
   expect(connectCalls("start")).toHaveLength(3); // landed: no more polls
 });
 
-it("re-asks for the form only when the index reload moved the cache", async () => {
+it("re-asks for the form only when a reload moved the cache from what it was before", async () => {
   // The Model pills come from the cache, so a reload that changed nothing is not worth a
-  // second validate on a socket core answers one request at a time.
+  // second validate on a socket core answers one request at a time. The open's reload
+  // has no age before it (the form was asked for first), so that one re-asks; a later
+  // one that leaves the cache as it was does not.
   stubFeatures(() => voiceFeature());
   let plans = 0;
   requestMutationMock.mockImplementation(async (action: string, payload: { plan?: boolean }) => {
     if (action === "settings.channel.validate") return validation("local");
+    if (action === "settings.channel.configure") return { name: "voice", saved: true, saved_keys: [PATCH_KEY] };
     if (action === "settings.channel.connect.start" && payload.plan) {
       plans += 1;
       return {
         session_id: "", status: "planned",
-        index: { cached_unix: 7, refreshing: plans < 2, error: null },
+        index: { cached_unix: 7, refreshing: plans === 1 || plans === 3, error: null },
         plan: { fetch: [], prune: [], unknown: [], fetch_bytes: 0, prune_bytes: 0, free_bytes: 1 },
       };
     }
@@ -473,9 +476,50 @@ it("re-asks for the form only when the index reload moved the cache", async () =
   fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
   await screen.findByLabelText("Microphone");
   await waitFor(() => expect(connectCalls("start")).toHaveLength(2), { timeout: 4000 });
+  await waitFor(() => expect(validateCalls()).toHaveLength(2));
+  // an edit: its own validate, then the save's plan finds the gateway reloading
+  fireEvent.change(screen.getByLabelText("Microphone"), { target: { value: "plughw:1,0" } });
+  await waitFor(() => expect(connectCalls("start")).toHaveLength(4), { timeout: 4000 });
   await new Promise((resolve) => setTimeout(resolve, 1200));
-  expect(validateCalls()).toHaveLength(1);
-  expect(connectCalls("start")).toHaveLength(2); // landed: no more polls
+  expect(validateCalls()).toHaveLength(3);
+  expect(connectCalls("start")).toHaveLength(4); // landed: no more polls
+});
+
+it("follows a reload the gateway starts itself, even one its first answer already saw land", async () => {
+  // A saved section naming another index makes the gateway reload on its own; the panel
+  // polls it like one it asked for and re-asks for the form once it lands. The answer
+  // that says it started can already carry the new cache (it ran behind that very plan),
+  // so the reload is measured against the age from before it.
+  stubFeatures(() => voiceFeature());
+  let plans = 0;
+  let reloaded = false;
+  requestMutationMock.mockImplementation(async (action: string, payload: { plan?: boolean }) => {
+    if (action === "settings.channel.validate") {
+      const base = validation("local");
+      const [general, ...rest] = base.form.sections;
+      const help = reloaded ? "Pills from the index just loaded." : general.fields[0].help;
+      return { ...base, form: { sections: [{ ...general, fields: [{ ...general.fields[0], help }] }, ...rest] } };
+    }
+    if (action === "settings.channel.configure") return { name: "voice", saved: true, saved_keys: [PATCH_KEY] };
+    if (action === "settings.channel.connect.start" && payload.plan) {
+      plans += 1;
+      if (plans === 2) reloaded = true; // the save's plan: the reload ran behind it and landed
+      return {
+        session_id: "", status: "planned",
+        index: { cached_unix: plans === 1 ? 1 : 2, refreshing: plans === 2, error: null },
+        plan: { fetch: [], prune: [], unknown: [], fetch_bytes: 0, prune_bytes: 0, free_bytes: 1 },
+      };
+    }
+    return settingsPayload();
+  });
+  renderSettingsView({ initialSection: "channels" });
+  fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
+  await screen.findByLabelText("Microphone");
+  await waitFor(() => expect(validateCalls()).toHaveLength(2));
+  fireEvent.change(screen.getByLabelText("Microphone"), { target: { value: "plughw:1,0" } });
+  expect(await screen.findByText("Pills from the index just loaded.", {}, { timeout: 4000 })).toBeInTheDocument();
+  expect(connectCalls("start")[1][1]).toEqual({ channel: "voice", plan: true }); // the gateway's own
+  expect(connectCalls("start")).toHaveLength(3);
 });
 
 it("stops waiting when the validator answers without a form", async () => {
@@ -849,6 +893,7 @@ it("shows the connector's refusal and keeps a custom key editable", async () => 
   expect(screen.getByLabelText("Custom")).toBeChecked();
   expect(await screen.findByText("stt/whisper/mine/onnx is not in the model index. Fetch it by hand or pick a listed model.")).toBeInTheDocument();
   expect(screen.getByText("The model index could not be refreshed. The choices are the last cached list.", { exact: false })).toBeInTheDocument();
+  expect(screen.getByText("cannot read weights index: offline")).toBeInTheDocument(); // what failed, and where
   // the offline notice retries in place, reloading the index
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
   await waitFor(() => expect(connectCalls("start")).toHaveLength(2));

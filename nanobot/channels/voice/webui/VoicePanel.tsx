@@ -226,11 +226,17 @@ export function VoicePanel({
       setIndexError(payload.index?.error ?? null);
       const cached = payload.index?.cached_unix;
       if (payload.index?.refreshing) {
+        // Also a reload the gateway started itself, the section naming another index. It
+        // is measured against the cache from before it: an answer while it runs may
+        // already carry the new one.
+        reloading.current = true;
         setIndexPoll((count) => count + 1);
-      } else if (reloading.current) {
+        return;
+      }
+      if (reloading.current) {
         reloading.current = false;
         // The Model pills are drawn from the cache, so only a reload that moved it is
-        // worth a second validate; an unknown age (the reload beat the first answer) is.
+        // worth a second validate; an unknown age (nothing answered before it) is.
         const moved = cachedAt.current === undefined || cached !== cachedAt.current;
         if (!payload.index?.error && moved) setFormEpoch((epoch) => epoch + 1);
       }
@@ -820,6 +826,8 @@ export function VoicePanel({
                     >
                       {tx("custom.retry", "Retry")}
                     </button>
+                    {/* What failed and where: the index is the section's, so it may be the one just typed. */}
+                    <span className="mt-0.5 block text-muted-foreground/80 [overflow-wrap:anywhere]">{indexError}</span>
                   </li>
                 ) : null}
               </ul>

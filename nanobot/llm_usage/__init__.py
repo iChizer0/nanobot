@@ -4,16 +4,30 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from nanobot.config.paths import get_data_dir
 from nanobot.llm_usage.models import LLMCallRecord
-from nanobot.llm_usage.store import LLMUsageStore
+
+if TYPE_CHECKING:
+    from nanobot.llm_usage.store import LLMUsageStore
 
 _STORES_LOCK = threading.Lock()
 _STORES: dict[Path, LLMUsageStore] = {}
+# The store is sqlite3's, which minimal interpreter builds (Buildroot, Yocto) leave out: it
+# is imported on first use, so the agent loop never needs sqlite3, and usage then goes
+# unrecorded, said once.
+_SQLITE_MISSING = False
+
+
+def __getattr__(name: str) -> Any:
+    if name == "LLMUsageStore":
+        from nanobot.llm_usage.store import LLMUsageStore
+
+        return LLMUsageStore
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def empty_usage_payload() -> dict[str, Any]:
@@ -43,6 +57,8 @@ def llm_usage_store_path() -> Path:
 
 
 def get_llm_usage_store(path: Path | None = None) -> LLMUsageStore:
+    from nanobot.llm_usage.store import LLMUsageStore
+
     resolved = (path or llm_usage_store_path()).resolve(strict=False)
     with _STORES_LOCK:
         store = _STORES.get(resolved)
@@ -52,12 +68,26 @@ def get_llm_usage_store(path: Path | None = None) -> LLMUsageStore:
         return store
 
 
+def _sqlite_missing(exc: BaseException) -> bool:
+    """Whether ``exc`` is this interpreter lacking sqlite3, warning the first time."""
+    global _SQLITE_MISSING
+    if not (isinstance(exc, ModuleNotFoundError) and exc.name in ("sqlite3", "_sqlite3")):
+        return False
+    if not _SQLITE_MISSING:
+        _SQLITE_MISSING = True
+        logger.warning("LLM usage is not recorded: this Python was built without sqlite3")
+    return True
+
+
 def record_llm_call(call: LLMCallRecord) -> None:
     """Default fail-open callback attached to gateway provider snapshots."""
+    if _SQLITE_MISSING:
+        return
     try:
         get_llm_usage_store().record(call)
-    except Exception:
-        logger.exception("failed to record LLM usage")
+    except Exception as exc:
+        if not _sqlite_missing(exc):
+            logger.exception("failed to record LLM usage")
 
 
 def llm_usage_payload(
@@ -65,13 +95,16 @@ def llm_usage_payload(
     days: int = 371,
     timezone_name: str | None = None,
 ) -> dict[str, Any]:
+    if _SQLITE_MISSING:
+        return empty_usage_payload()
     try:
         return get_llm_usage_store().usage_payload(
             days=days,
             timezone_name=timezone_name,
         )
-    except Exception:
-        logger.exception("failed to query LLM usage")
+    except Exception as exc:
+        if not _sqlite_missing(exc):
+            logger.exception("failed to query LLM usage")
         return empty_usage_payload()
 
 

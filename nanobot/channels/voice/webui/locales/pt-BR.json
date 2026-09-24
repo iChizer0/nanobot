@@ -15,6 +15,7 @@
     "fetching": "Baixando {{key}}",
     "customModel": "Personalizado",
     "installed": "instalado",
+    "update": "atualização",
     "unknownModel": "{{key}} não está no índice de modelos. Baixe manualmente ou escolha um modelo da lista.",
     "planSummary": "Aplicar baixa e remove os modelos acima. {{free}} livres.",
     "planSummaryNoFree": "Aplicar baixa e remove os modelos acima.",

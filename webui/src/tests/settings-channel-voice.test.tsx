@@ -907,6 +907,38 @@ it("shows the connector's refusal and keeps a custom key editable", async () => 
   expect(toggle).not.toBeChecked();
 });
 
+it("offers a model the index changed since as an update, and says when one could not land", async () => {
+  stubFeatures(() => voiceFeature({ enabled: true, runtime_status: "running" }));
+  const progress = { stage: "fetch", key: "stt/whisper/base/onnx", file: "encoder.onnx", done_bytes: 0, total_bytes: 62_000_000, keys_done: 0, keys_total: 2 };
+  requestMutationMock.mockImplementation(async (action: string, payload: Record<string, unknown>) => {
+    if (action === "settings.channel.validate") return validation("local");
+    if (action === "settings.channel.connect.start" && payload.plan) {
+      return { session_id: "", status: "planned", index: { cached_unix: 1, refreshing: false, error: null },
+        plan: { fetch: [
+          { key: "stt/whisper/base/onnx", bytes: 60_000_000, update: true, license: "MIT", notice: null },
+          { key: "vad/silero/v6/onnx", bytes: 2_000_000, update: false, license: "MIT", notice: null },
+        ], prune: [], unknown: [], fetch_bytes: 62_000_000, prune_bytes: 0, free_bytes: 1e9 } };
+    }
+    if (action === "settings.channel.connect.start") return { session_id: "s1", status: "pending", interval_ms: 40, progress };
+    if (action === "settings.channel.connect.poll") {
+      return { session_id: "s1", status: "succeeded", interval_ms: 40, message: "Models fetched 1 (2 MB).",
+        warning: "stt/whisper/base/onnx stays as installed: download failed", progress: { ...progress, stage: "done" } };
+    }
+    return settingsPayload();
+  });
+
+  renderSettingsView({ initialSection: "channels" });
+  fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
+  // an update needs no pending edit to apply
+  const apply = await screen.findByRole("button", { name: "Fetch 62 MB and restart" });
+  expect(apply).toBeEnabled();
+  expect(screen.getByText("update · 60 MB")).toBeInTheDocument();
+  expect(screen.getByText("2 MB")).toBeInTheDocument();
+  // the run succeeds on the installed model, and the notice says which stayed
+  fireEvent.click(apply);
+  expect(await screen.findByText("stt/whisper/base/onnx stays as installed: download failed")).toBeInTheDocument();
+});
+
 it("picks an engine's first model with the engine", async () => {
   stubFeatures(() => voiceFeature());
   requestMutationMock.mockImplementation(async (action: string) => {

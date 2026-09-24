@@ -15,6 +15,7 @@
     "fetching": "正在下载 {{key}}",
     "customModel": "自定义",
     "installed": "已安装",
+    "update": "更新",
     "unknownModel": "{{key}} 不在模型索引中。请手动下载，或选择列出的模型。",
     "planSummary": "应用会下载并删除上面列出的模型。剩余空间 {{free}}。",
     "planSummaryNoFree": "应用会下载并删除上面列出的模型。",

@@ -15,6 +15,7 @@
     "fetching": "{{key}} 다운로드 중",
     "customModel": "직접 입력",
     "installed": "설치됨",
+    "update": "업데이트",
     "unknownModel": "{{key}}은(는) 모델 인덱스에 없습니다. 직접 받거나 목록의 모델을 고르세요.",
     "planSummary": "적용하면 위 목록의 모델을 다운로드하고 삭제합니다. 여유 공간 {{free}}.",
     "planSummaryNoFree": "적용하면 위 목록의 모델을 다운로드하고 삭제합니다.",

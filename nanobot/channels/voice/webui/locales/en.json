@@ -15,6 +15,7 @@
     "fetching": "Fetching {{key}}",
     "customModel": "Custom",
     "installed": "installed",
+    "update": "update",
     "unknownModel": "{{key}} is not in the model index. Fetch it by hand or pick a listed model.",
     "planSummary": "Apply downloads and removes the models above. {{free}} free.",
     "planSummaryNoFree": "Apply downloads and removes the models above.",

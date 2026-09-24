@@ -15,6 +15,7 @@
     "fetching": "Mengunduh {{key}}",
     "customModel": "Kustom",
     "installed": "terpasang",
+    "update": "pembaruan",
     "unknownModel": "{{key}} tidak ada di indeks model. Unduh secara manual atau pilih model dari daftar.",
     "planSummary": "Terapkan mengunduh dan menghapus model di atas. Tersisa {{free}}.",
     "planSummaryNoFree": "Terapkan mengunduh dan menghapus model di atas.",

@@ -15,6 +15,7 @@
     "fetching": "Đang tải {{key}}",
     "customModel": "Tùy chỉnh",
     "installed": "đã cài",
+    "update": "cập nhật",
     "unknownModel": "{{key}} không có trong chỉ mục mô hình. Hãy tải thủ công hoặc chọn một mô hình trong danh sách.",
     "planSummary": "Áp dụng sẽ tải và xóa các mô hình ở trên. Còn trống {{free}}.",
     "planSummaryNoFree": "Áp dụng sẽ tải và xóa các mô hình ở trên.",

@@ -262,6 +262,7 @@ export function VoicePanel({
     if (payload.status === "succeeded") {
       if (payload.nanobot_features) onFeaturesUpdate(payload.nanobot_features);
       setFormEpoch((epoch) => epoch + 1);
+      if (payload.warning) setNotice(payload.warning);
     } else {
       setNotice(payload.message ?? core("settings.channels.validationFailed", "Check the required setup before enabling."));
     }
@@ -773,7 +774,9 @@ export function VoicePanel({
                     <div className="flex items-start gap-2">
                       <Download className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
                       <span className="min-w-0 break-all font-mono text-[11.5px]">{item.key}</span>
-                      <span className="ms-auto shrink-0 text-[11px] text-muted-foreground">{item.bytes ? formatBytes(item.bytes) : ""}</span>
+                      <span className="ms-auto shrink-0 text-[11px] text-muted-foreground">
+                        {[item.update ? tx("custom.update", "update") : "", item.bytes ? formatBytes(item.bytes) : ""].filter(Boolean).join(" · ")}
+                      </span>
                     </div>
                     {item.notice ? (
                       <label className="ms-[22px] mt-1 flex items-start gap-2 text-[11px] leading-4 text-muted-foreground">

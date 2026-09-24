@@ -6,7 +6,8 @@ import type { ChannelConnectPayload } from "@/lib/types";
  * `failed` or `cancelled`.
  */
 export type SyncPlan = {
-  fetch: { key: string; bytes: number; license?: string | null; notice?: string | null }[];
+  /** `update`: installed already, but not as the index pins it now; `bytes` counts what changed. */
+  fetch: { key: string; bytes: number; update?: boolean; license?: string | null; notice?: string | null }[];
   prune: { key: string; bytes: number }[];
   unknown: string[];
   fetch_bytes: number;
@@ -30,6 +31,8 @@ export type SyncPayload = Omit<ChannelConnectPayload, "status"> & {
   /** The cached index's age, whether a reload runs behind this answer, the last reload's error. */
   index?: { cached_unix: number; refreshing: boolean; error: string | null };
   progress?: SyncProgress;
+  /** On success: the updates that could not land, their models staying as installed. */
+  warning?: string;
 };
 
 /** A run's terminal statuses: the panel settles one of these, core acts on "succeeded". */

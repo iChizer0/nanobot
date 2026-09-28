@@ -127,22 +127,8 @@ class ContextBuilder:
             )
 
         if include_memory:
-            memory = self.memory.read_memory()
-            if memory and not self._is_template_content(memory, "memory/MEMORY.md"):
-                parts.append(f"# Memory\n\n## Long-term Memory\n{memory}")
-
-        active_skills = self.skills.get_always_skills()
-        if active_skills:
-            active_content = self.skills.load_skills_for_context(active_skills)
-            if active_content:
-                parts.append(f"# Active Skills\n\n{active_content}")
-
-        skills_summary = self.skills.build_skills_summary(
-            exclude=set(active_skills),
-            workspace=root,
-        )
-        if skills_summary:
-            parts.append(render_template("agent/skills_section.md", skills_summary=skills_summary))
+            parts.extend(self._memory_sections())
+        parts.extend(self._skills_sections(root))
 
         if session_summary and session_summary["text"] != "(nothing)":
             parts.append(
@@ -152,6 +138,48 @@ class ContextBuilder:
             )
 
         return "\n\n---\n\n".join(parts)
+
+    def build_agent_context(
+        self,
+        *,
+        workspace: Path | None = None,
+        include_memory: bool = True,
+        include_skills: bool = True,
+    ) -> str:
+        """The agent's standing context for an external model that runs without this
+        system prompt (e.g. a speech-to-speech backend): the profile files, memory and
+        skills, with no identity, tool contract or format guidance."""
+        root = workspace or self.workspace
+        parts = [f"# Workspace\n\nWorking directory: {root.expanduser().resolve()}"]
+        bootstrap = self._load_bootstrap_files(root)
+        if bootstrap:
+            parts.append(bootstrap)
+        if include_memory:
+            parts.extend(self._memory_sections())
+        if include_skills:
+            parts.extend(self._skills_sections(root))
+        return "\n\n---\n\n".join(parts)
+
+    def _memory_sections(self) -> list[str]:
+        memory = self.memory.read_memory()
+        if memory and not self._is_template_content(memory, "memory/MEMORY.md"):
+            return [f"# Memory\n\n## Long-term Memory\n{memory}"]
+        return []
+
+    def _skills_sections(self, root: Path) -> list[str]:
+        parts: list[str] = []
+        active_skills = self.skills.get_always_skills()
+        if active_skills:
+            active_content = self.skills.load_skills_for_context(active_skills)
+            if active_content:
+                parts.append(f"# Active Skills\n\n{active_content}")
+        skills_summary = self.skills.build_skills_summary(
+            exclude=set(active_skills),
+            workspace=root,
+        )
+        if skills_summary:
+            parts.append(render_template("agent/skills_section.md", skills_summary=skills_summary))
+        return parts
 
     def _get_identity(self, channel: str | None = None, workspace: Path | None = None) -> str:
         """Get the core identity section."""

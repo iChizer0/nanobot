@@ -18,6 +18,7 @@ from nanobot.cli.gateway_runtime import (
     _close_gateway_runtime,
     _gateway_readiness_payload,
     _MCPReadinessHook,
+    _MCPReadyToolGateway,
 )
 
 
@@ -103,6 +104,38 @@ async def test_mcp_readiness_hook_delegates_to_application_provider() -> None:
     await hook.before_run(AgentRunHookContext(messages=[]))
 
     assert provider.connect_calls == 1
+
+
+async def test_tool_gateway_connects_mcp_before_listing_tools() -> None:
+    """A channel lists tools at startup, possibly before the agent run connects MCP."""
+    provider = _TrackingMCPProvider()
+    calls: list[tuple] = []
+
+    class _Agent:
+        async def get_tool_definitions(self) -> list[dict]:
+            calls.append(("list", provider.connect_calls))
+            return [{"type": "function", "function": {"name": "t"}}]
+
+        async def execute_tool(self, name, args, *, channel, chat_id):
+            calls.append(("run", name, args, channel, chat_id))
+            return "ok"
+
+        async def get_agent_context(self, *, channel, chat_id, include_skills=True):
+            calls.append(("context", channel, chat_id, include_skills))
+            return "ctx"
+
+    gateway = _MCPReadyToolGateway(_Agent(), provider)
+
+    assert await gateway.get_tool_definitions() == [
+        {"type": "function", "function": {"name": "t"}}
+    ]
+    assert await gateway.execute_tool("t", {"a": 1}, channel="voice", chat_id="c") == "ok"
+    assert await gateway.get_agent_context(channel="voice", chat_id="c", include_skills=False) == "ctx"
+    assert calls == [
+        ("list", 1),
+        ("run", "t", {"a": 1}, "voice", "c"),
+        ("context", "voice", "c", False),
+    ]
 
 
 async def _cancellable_task(events: list[str]) -> None:

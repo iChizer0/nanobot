@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import dataclasses
 import os
 import time
@@ -69,6 +70,7 @@ from nanobot.runtime_context import (
     runtime_context_blocks_from_metadata,
 )
 from nanobot.security.workspace_access import (
+    WorkspaceScope,
     WorkspaceScopeResolver,
     bind_workspace_scope,
     reset_workspace_scope,
@@ -77,7 +79,11 @@ from nanobot.session import turn_continuation
 from nanobot.session.automation_turns import automation_history_overrides
 from nanobot.session.goal_state import goal_state_runtime_lines, sustained_goal_active
 from nanobot.session.history_visibility import HIDDEN_HISTORY_META
-from nanobot.session.keys import UNIFIED_SESSION_KEY, remember_last_channel
+from nanobot.session.keys import (
+    UNIFIED_SESSION_KEY,
+    remember_last_channel,
+    session_key_for_channel,
+)
 from nanobot.session.manager import SESSION_CACHE_MAX_SIZE, Session, SessionManager
 from nanobot.session.model_selection import (
     SESSION_MODEL_PRESET_METADATA_KEY,
@@ -234,6 +240,84 @@ class AgentLoop:
     @model_preset.setter
     def model_preset(self, name: str | None) -> None:
         self.set_model_preset(name)
+
+    async def get_tool_definitions(self) -> list[dict]:
+        """OpenAI-style function schemas for this loop's live tool registry.
+
+        For a channel that drives an external model emitting its own tool calls.
+        Returns a copy: the registry hands out its cached list, and callers adapt
+        schemas to their model's dialect.
+        """
+        return copy.deepcopy(self.tools.get_definitions())
+
+    async def execute_tool(
+        self,
+        name: str,
+        args: Any,
+        *,
+        channel: str,
+        chat_id: str,
+    ) -> Any:
+        """Execute one tool under the same guards as a normal turn.
+
+        Binds the file-state / request / workspace contextvars as
+        ``_run_agent_loop`` does and resets them in ``finally``, so a
+        channel-driven call gains no capability over a bus-driven one. The
+        session key is derived as the bus derives it, so both share one session.
+
+        This is the tool slice of a turn, not a turn: it does not serialize with
+        that session's bus turns, results come back whole (no
+        ``max_tool_result_chars`` truncation), and ``create_goal`` is unavailable
+        because no turn scope is entered.
+        """
+        session_key, session, scope = self._channel_session_scope(channel, chat_id)
+        request_ctx = RequestContext(
+            channel=channel,
+            chat_id=chat_id,
+            session_key=session_key,
+            # Read the resolved value: llm_runtime() refreshes and may publish.
+            runtime=self.runtime_resolver.runtime,
+            workspace=scope.project_path,
+            log_content=session.policy.log_content,
+        )
+        file_state_token = bind_file_states(self._file_state_store.for_session(session_key))
+        request_token = bind_request_context(request_ctx)
+        workspace_token = bind_workspace_scope(scope)
+        try:
+            return await self.tools.execute(name, args)
+        finally:
+            reset_workspace_scope(workspace_token)
+            reset_request_context(request_token)
+            reset_file_states(file_state_token)
+
+    async def get_agent_context(
+        self,
+        *,
+        channel: str,
+        chat_id: str,
+        include_skills: bool = True,
+    ) -> str:
+        """The agent's standing context (workspace, profile files, memory, skills) for
+        an external model that runs without nanobot's system prompt, resolved for the
+        session the bus would use. Memory is left out where the session keeps none."""
+        _, session, scope = self._channel_session_scope(channel, chat_id)
+        return self.context.build_agent_context(
+            workspace=scope.project_path,
+            include_memory=session.policy.persist,
+            include_skills=include_skills,
+        )
+
+    def _channel_session_scope(self, channel: str, chat_id: str) -> tuple[str, Session, WorkspaceScope]:
+        session_key = session_key_for_channel(
+            channel, chat_id, unified_session=self._unified_session,
+        )
+        session = self.sessions.get_or_create(session_key)
+        scope = self.workspace_scopes.for_turn(
+            channel=channel,
+            message_metadata=None,
+            session_metadata=session.metadata,
+        )
+        return session_key, session, scope
 
     def llm_runtime(self) -> LLMRuntime:
         """Resolve the immutable default used to admit the next turn."""

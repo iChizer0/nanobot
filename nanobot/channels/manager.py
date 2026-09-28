@@ -25,7 +25,7 @@ from nanobot.bus.outbound_events import (
 )
 from nanobot.bus.queue import MessageBus
 from nanobot.channels._setup import channel_setup_spec
-from nanobot.channels.base import BaseChannel
+from nanobot.channels.base import BaseChannel, ToolGateway
 from nanobot.channels.contracts import (
     channel_default_config,
     channel_instance_specs,
@@ -97,6 +97,7 @@ class ChannelManager:
         session_manager: "SessionManager | None" = None,
         cron_service: CronService | None = None,
         local_trigger_store: LocalTriggerStore | None = None,
+        tool_gateway: ToolGateway | None = None,
         webui_runtime_model_name: Callable[[], str | None] | None = None,
         webui_refresh_runtime_config: Callable[[], None] | None = None,
         webui_cron_pending_job_ids: Callable[[str], set[str]] | None = None,
@@ -122,6 +123,8 @@ class ChannelManager:
         self._session_manager = session_manager
         self._cron_service = cron_service
         self._local_trigger_store = local_trigger_store
+        # Handed only to channels that opt in via ``wants_tool_gateway``.
+        self._tool_gateway = tool_gateway
         self._webui_runtime_model_name = webui_runtime_model_name
         self._webui_refresh_runtime_config = webui_refresh_runtime_config
         self._webui_cron_pending_job_ids = webui_cron_pending_job_ids
@@ -213,6 +216,13 @@ class ChannelManager:
                 logger=logger,
             )
             kwargs["gateway"] = gateway
+        if cls.wants_tool_gateway:
+            if self._tool_gateway is None:
+                logger.warning(
+                    "{} channel wants the tool gateway but none is wired; "
+                    "it runs without agent tools", cls.display_name,
+                )
+            kwargs["tool_gateway"] = self._tool_gateway
         channel = cls(section, self.bus, **kwargs)
         if runtime_name and runtime_name != channel.name:
             channel.name = runtime_name

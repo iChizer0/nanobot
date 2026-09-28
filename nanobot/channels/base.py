@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Protocol, cast, runtime_checkable
 
 from loguru import logger
 
@@ -16,6 +16,45 @@ from nanobot.pairing import (
     generate_code,
     is_approved,
 )
+
+
+@runtime_checkable
+class ToolGateway(Protocol):
+    """Guarded access to the agent's tools, for channels that drive an external model.
+
+    A channel wrapping a model that emits its own tool calls (e.g. a
+    speech-to-speech backend) must declare nanobot's tools and context to that
+    model and execute what comes back; the bus offers no path for any of it.
+    ``execute_tool`` runs under the same workspace / SSRF / file-state guards as
+    a normal turn, so a channel-driven call gains no capability over a bus-driven
+    one.
+    """
+
+    async def get_tool_definitions(self) -> list[dict]:
+        """OpenAI-style function schemas for the agent's live tool registry."""
+        ...
+
+    async def execute_tool(
+        self,
+        name: str,
+        args: Any,
+        *,
+        channel: str,
+        chat_id: str,
+    ) -> Any:
+        """Execute one tool under the normal turn's guards; return its result."""
+        ...
+
+    async def get_agent_context(
+        self,
+        *,
+        channel: str,
+        chat_id: str,
+        include_skills: bool = True,
+    ) -> str:
+        """The agent's workspace, profile files, memory and skills, for the external
+        model's instructions."""
+        ...
 
 
 class BaseChannel(ABC):
@@ -31,6 +70,9 @@ class BaseChannel(ABC):
     send_progress: bool = True
     send_tool_hints: bool = True
     show_reasoning: bool = True
+    # Opt in to a ``tool_gateway: ToolGateway | None`` keyword argument; only for a
+    # channel that drives an external model emitting its own tool calls.
+    wants_tool_gateway: bool = False
 
     def __init__(self, config: Any, bus: MessageBus):
         """

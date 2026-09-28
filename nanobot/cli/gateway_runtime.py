@@ -63,6 +63,43 @@ class _MCPReadinessHook(AgentHook):
         await self._provider.connect()
 
 
+class _MCPReadyToolGateway:
+    """The agent loop's tool gateway, connecting MCP before tools are listed.
+
+    A channel declares tools at startup, possibly before the agent run has
+    connected MCP, so the listing retries the connection as a turn would.
+    """
+
+    def __init__(self, agent: AgentLoop, provider: MCPProvider) -> None:
+        self._agent = agent
+        self._provider = provider
+
+    async def get_tool_definitions(self) -> list[dict]:
+        await self._provider.connect()
+        return await self._agent.get_tool_definitions()
+
+    async def execute_tool(
+        self,
+        name: str,
+        args: Any,
+        *,
+        channel: str,
+        chat_id: str,
+    ) -> Any:
+        return await self._agent.execute_tool(name, args, channel=channel, chat_id=chat_id)
+
+    async def get_agent_context(
+        self,
+        *,
+        channel: str,
+        chat_id: str,
+        include_skills: bool = True,
+    ) -> str:
+        return await self._agent.get_agent_context(
+            channel=channel, chat_id=chat_id, include_skills=include_skills,
+        )
+
+
 def _http_endpoint_responding(url: str, *, timeout_s: float = 0.25) -> bool:
     """Return whether an HTTP endpoint responds, including with an auth error."""
     import urllib.error
@@ -722,6 +759,7 @@ def _run_gateway(
         session_manager=session_manager,
         cron_service=cron,
         local_trigger_store=trigger_store,
+        tool_gateway=_MCPReadyToolGateway(agent, mcp_provider),
         webui_runtime_model_name=_webui_runtime_model_name,
         webui_refresh_runtime_config=_webui_refresh_runtime_config,
         webui_cron_pending_job_ids=agent.pending_cron_job_ids_for_session,

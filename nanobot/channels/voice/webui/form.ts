@@ -55,7 +55,9 @@ export type VoiceFormSection = {
 
 export type VoiceForm = { sections: VoiceFormSection[] };
 
-export type VoiceValidationPayload = ChannelValidationPayload & { form?: VoiceForm };
+/** `restart`: the running channel started without a model it could load now (fetched
+ * since, or it failed to load), so Apply restarts it even with nothing to apply. */
+export type VoiceValidationPayload = ChannelValidationPayload & { form?: VoiceForm; restart?: boolean };
 
 export type VoicePatch = Record<string, unknown>;
 

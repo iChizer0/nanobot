@@ -459,7 +459,7 @@ export function VoicePanel({
 
   const unaccepted = pendingNotices(plan, accepted);
   const pendingCount = Object.keys(patch).length;
-  const showApply = planHasWork(plan) || (pendingCount > 0 && running);
+  const showApply = planHasWork(plan) || (running && (pendingCount > 0 || validation?.restart === true));
   const applyBlocked = unaccepted.length > 0 || Boolean(plan?.unknown.length);
   const applyLabel = plan?.fetch_bytes
     ? running

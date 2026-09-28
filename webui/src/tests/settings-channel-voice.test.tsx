@@ -963,3 +963,37 @@ it("picks an engine's first model with the engine", async () => {
   expect(JSON.parse((configureCalls()[0][1] as { values: Record<string, string> }).values[PATCH_KEY]))
     .toEqual({ vad: { turn: { engine: "smartturn", weights: "vad/smartturn/v3.2/onnx" } } });
 });
+
+function stubEmptyPlan(restart: boolean) {
+  requestMutationMock.mockImplementation(async (action: string, payload: Record<string, unknown>) => {
+    if (action === "settings.channel.validate") return validation("local", restart ? { restart: true } : {});
+    if (action === "settings.channel.connect.start" && payload.plan) {
+      return { session_id: "", status: "planned", index: { cached_unix: 1, refreshing: false, error: null },
+        plan: { fetch: [], prune: [], unknown: [], fetch_bytes: 0, prune_bytes: 0, free_bytes: 1e9 } };
+    }
+    if (action === "settings.channel.connect.start") return { session_id: "", status: "succeeded", message: "Models are in place." };
+    return settingsPayload();
+  });
+}
+
+it("keeps Apply hidden on a running channel with nothing to fetch or apply", async () => {
+  stubFeatures(() => voiceFeature({ enabled: true, runtime_status: "running" }));
+  stubEmptyPlan(false);
+
+  renderSettingsView({ initialSection: "channels" });
+  fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
+  expect(await screen.findByDisplayValue("default")).toBeInTheDocument();
+  await waitFor(() => expect(connectCalls("start")).toHaveLength(1));
+  expect(screen.queryByRole("button", { name: "Apply and restart" })).not.toBeInTheDocument();
+});
+
+it("offers a restart when the running channel started without a model it has now", async () => {
+  stubFeatures(() => voiceFeature({ enabled: true, runtime_status: "running" }));
+  stubEmptyPlan(true);
+
+  renderSettingsView({ initialSection: "channels" });
+  fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
+  // nothing to fetch and nothing edited: the validator's word alone shows it
+  fireEvent.click(await screen.findByRole("button", { name: "Apply and restart" }));
+  await waitFor(() => expect(connectCalls("start").filter((call) => !(call[1] as { plan?: boolean }).plan)).toHaveLength(1));
+});

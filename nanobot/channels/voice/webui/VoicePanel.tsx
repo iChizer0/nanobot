@@ -132,6 +132,8 @@ export function VoicePanel({
   const [sync, setSync] = useState<SyncRun | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [formEpoch, setFormEpoch] = useState(0);
+  // An Apply (re)started the channel, whose check ran while it was still loading.
+  const [recheckWhenUp, setRecheckWhenUp] = useState(false);
   const savePromiseRef = useRef<Promise<boolean> | null>(null);
   const refreshSerial = useRef(0);
   const planSerial = useRef(0);
@@ -262,6 +264,7 @@ export function VoicePanel({
     if (payload.status === "succeeded") {
       if (payload.nanobot_features) onFeaturesUpdate(payload.nanobot_features);
       setFormEpoch((epoch) => epoch + 1);
+      setRecheckWhenUp(true);
       if (payload.warning) setNotice(payload.warning);
     } else {
       setNotice(payload.message ?? core("settings.channels.validationFailed", "Check the required setup before enabling."));
@@ -269,6 +272,16 @@ export function VoicePanel({
     void refreshPlan();
   }, [onFeaturesUpdate, refreshPlan]); // eslint-disable-line react-hooks/exhaustive-deps
   settleRef.current = settleSync;
+
+  // Check the setup again when the channel comes up, whoever restarted it (an Apply, the
+  // toggle, another session): what it started without is known only then.
+  const wasUp = useRef(feature.runtime_status === "running");
+  useEffect(() => {
+    const up = feature.runtime_status === "running";
+    if (up && (!wasUp.current || recheckWhenUp)) setFormEpoch((epoch) => epoch + 1);
+    if (feature.runtime_status !== "starting") setRecheckWhenUp(false);
+    wasUp.current = up;
+  }, [recheckWhenUp, feature.runtime_status]);
 
   // Follow the run by polling, the way core's connect flows do: a poll that fails is
   // retried, since the download goes on in the gateway, unless the session is gone (a

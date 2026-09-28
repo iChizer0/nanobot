@@ -997,3 +997,49 @@ it("offers a restart when the running channel started without a model it has now
   fireEvent.click(await screen.findByRole("button", { name: "Apply and restart" }));
   await waitFor(() => expect(connectCalls("start").filter((call) => !(call[1] as { plan?: boolean }).plan)).toHaveLength(1));
 });
+
+it("checks the setup again once the channel it restarted is up", async () => {
+  let current = voiceFeature({ enabled: true, runtime_status: "running" });
+  stubFeatures(() => current);
+  requestMutationMock.mockImplementation(async (action: string, payload: Record<string, unknown>) => {
+    if (action === "settings.channel.validate") return validation("local", { restart: true });
+    if (action === "settings.channel.connect.start" && payload.plan) {
+      return { session_id: "", status: "planned", index: { cached_unix: 1, refreshing: false, error: null },
+        plan: { fetch: [], prune: [], unknown: [], fetch_bytes: 0, prune_bytes: 0, free_bytes: 1e9 } };
+    }
+    if (action === "settings.channel.connect.start") {
+      current = voiceFeature({ enabled: true, runtime_status: "starting" }); // core restarted it: loading
+      return { session_id: "", status: "succeeded", message: "Models are in place.",
+        nanobot_features: { features: [current], enabled_count: 1 } };
+    }
+    return settingsPayload();
+  });
+
+  renderSettingsView({ initialSection: "channels" });
+  fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Apply and restart" }));
+  // the Apply's own checks: before the run, and after it settled, against a channel still loading
+  await waitFor(() => expect(validateCalls()).toHaveLength(3));
+  act(() => { window.dispatchEvent(new Event("focus")); }); // a features refresh: still starting
+  await new Promise((resolve) => { setTimeout(resolve, 600); });
+  expect(validateCalls()).toHaveLength(3);
+  current = voiceFeature({ enabled: true, runtime_status: "running" });
+  act(() => { window.dispatchEvent(new Event("focus")); }); // up: now its fallbacks are known
+  await waitFor(() => expect(validateCalls()).toHaveLength(4));
+});
+
+it("checks the setup again when the channel comes up however it was started", async () => {
+  let current = voiceFeature({ enabled: true, runtime_status: "starting" }); // opened while loading
+  stubFeatures(() => current);
+  stubEmptyPlan(false);
+
+  renderSettingsView({ initialSection: "channels" });
+  fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
+  await waitFor(() => expect(validateCalls()).toHaveLength(1));
+  current = voiceFeature({ enabled: true, runtime_status: "running" });
+  act(() => { window.dispatchEvent(new Event("focus")); });
+  await waitFor(() => expect(validateCalls()).toHaveLength(2));
+  act(() => { window.dispatchEvent(new Event("focus")); }); // still up: nothing new to learn
+  await new Promise((resolve) => { setTimeout(resolve, 600); });
+  expect(validateCalls()).toHaveLength(2);
+});

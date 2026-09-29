@@ -6,8 +6,18 @@ import type { ChannelConnectPayload } from "@/lib/types";
  * `failed` or `cancelled`.
  */
 export type SyncPlan = {
-  /** `update`: installed already, but not as the index pins it now; `bytes` counts what changed. */
-  fetch: { key: string; bytes: number; update?: boolean; license?: string | null; notice?: string | null }[];
+  /**
+   * `update`: installed already, but not as the index pins it now; `bytes` counts what changed.
+   * `accepted`: the section accepts its notice (`models.acceptNotices`), so it needs no tick.
+   */
+  fetch: {
+    key: string;
+    bytes: number;
+    update?: boolean;
+    license?: string | null;
+    notice?: string | null;
+    accepted?: boolean;
+  }[];
   prune: { key: string; bytes: number }[];
   unknown: string[];
   fetch_bytes: number;
@@ -25,6 +35,21 @@ export type SyncProgress = {
   keys_total: number;
 };
 
+/**
+ * The channel's own download of the models its setup lacks: `fetching` (its run's id, for
+ * Cancel, and progress), `waiting` to try again at `retry_unix`, `stopped`, or `reloading`
+ * until the channel has loaded what landed. It never ends in "succeeded": the channel
+ * reloads itself.
+ */
+export type SyncBackground = {
+  state: "fetching" | "waiting" | "stopped" | "reloading";
+  keys: string[];
+  error: string | null;
+  retry_unix: number | null;
+  session_id?: string;
+  progress?: SyncProgress;
+};
+
 export type SyncPayload = Omit<ChannelConnectPayload, "status"> & {
   status: ChannelConnectPayload["status"] | "planned";
   plan?: SyncPlan;
@@ -33,6 +58,7 @@ export type SyncPayload = Omit<ChannelConnectPayload, "status"> & {
   progress?: SyncProgress;
   /** On success: the updates that could not land, their models staying as installed. */
   warning?: string;
+  background?: SyncBackground | null;
 };
 
 /** A run's terminal statuses: the panel settles one of these, core acts on "succeeded". */
@@ -42,7 +68,9 @@ export function planHasWork(plan: SyncPlan | null): boolean {
   return Boolean(plan && (plan.fetch.length || plan.prune.length));
 }
 
-/** Notices still to accept before a run: the plan's, minus what the user ticked. */
+/** Notices still to accept before a run: the plan's, minus the section's and what the user ticked. */
 export function pendingNotices(plan: SyncPlan | null, accepted: ReadonlySet<string>): string[] {
-  return (plan?.fetch ?? []).filter((item) => item.notice && !accepted.has(item.key)).map((item) => item.key);
+  return (plan?.fetch ?? [])
+    .filter((item) => item.notice && !item.accepted && !accepted.has(item.key))
+    .map((item) => item.key);
 }

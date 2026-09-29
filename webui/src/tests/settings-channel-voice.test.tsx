@@ -1043,3 +1043,94 @@ it("checks the setup again when the channel comes up however it was started", as
   await new Promise((resolve) => { setTimeout(resolve, 600); });
   expect(validateCalls()).toHaveLength(2);
 });
+
+function stubPlan(plan: () => Record<string, unknown>) {
+  requestMutationMock.mockImplementation(async (action: string, payload: Record<string, unknown>) => {
+    if (action === "settings.channel.validate") return validation("local");
+    if (action === "settings.channel.connect.start" && payload.plan) {
+      return { session_id: "", status: "planned", index: { cached_unix: 1, refreshing: false, error: null }, ...plan() };
+    }
+    if (action === "settings.channel.connect.cancel") {
+      return { session_id: payload.session_id, status: "cancelled", message: "The background download stopped." };
+    }
+    return settingsPayload();
+  });
+}
+
+const SILERO_FETCH = {
+  fetch: [{ key: "vad/silero/v6/onnx", bytes: 2_000_000, update: false, license: "MIT", notice: null }],
+  prune: [], unknown: [], fetch_bytes: 2_000_000, prune_bytes: 0, free_bytes: 1e9,
+};
+
+it("shows the channel's own download with a Cancel, and leaves the form editable", async () => {
+  stubFeatures(() => voiceFeature({ enabled: true, runtime_status: "running" }));
+  let background: Record<string, unknown> | null = {
+    state: "fetching", keys: ["vad/silero/v6/onnx"], error: null, retry_unix: null, session_id: "own1",
+    progress: { stage: "fetch", key: "vad/silero/v6/onnx", file: "model.onnx", done_bytes: 1_000_000, total_bytes: 2_000_000, keys_done: 0, keys_total: 1 },
+  };
+  stubPlan(() => ({ plan: SILERO_FETCH, background }));
+  renderSettingsView({ initialSection: "channels" });
+  fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
+  expect(await screen.findByText(/The channel is downloading vad\/silero\/v6\/onnx · model\.onnx · 1 MB \/ 2 MB/)).toBeInTheDocument();
+  expect(screen.getByLabelText("Microphone")).toBeEnabled(); // not the panel's run: nothing waits on it
+  // an Apply stays on offer: the connector queues it behind the download
+  expect(screen.getByRole("button", { name: "Fetch 2 MB and restart" })).toBeEnabled();
+  background = { state: "stopped", keys: ["vad/silero/v6/onnx"], error: null, retry_unix: null };
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(connectCalls("cancel")).toHaveLength(1));
+  expect(connectCalls("cancel")[0][1]).toMatchObject({ session_id: "own1" });
+  expect(await screen.findByText("The channel's download stopped.")).toBeInTheDocument();
+});
+
+it("says when the channel tries its failed download again, and why it failed", async () => {
+  stubFeatures(() => voiceFeature({ enabled: true, runtime_status: "running" }));
+  const retry = Math.floor(Date.now() / 1000) + 300;
+  stubPlan(() => ({
+    plan: SILERO_FETCH,
+    background: { state: "waiting", keys: ["vad/silero/v6/onnx"], error: "cannot connect to huggingface.co", retry_unix: retry },
+  }));
+  renderSettingsView({ initialSection: "channels" });
+  fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
+  const time = new Date(retry * 1000).toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" });
+  expect(await screen.findByText(`The channel's download failed. It tries again at ${time}.`, { exact: false })).toBeInTheDocument();
+  expect(screen.getByText("cannot connect to huggingface.co")).toBeInTheDocument();
+});
+
+it("takes a notice the section accepts without a tick", async () => {
+  stubFeatures(() => voiceFeature({ enabled: true, runtime_status: "running" }));
+  stubPlan(() => ({
+    plan: {
+      ...SILERO_FETCH,
+      fetch: [{ key: "tts/mms/en/onnx", bytes: 2_000_000, update: false, license: "CC-BY-NC-4.0", notice: "Non-commercial use only.", accepted: true }],
+    },
+    background: null,
+  }));
+  renderSettingsView({ initialSection: "channels" });
+  fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
+  expect(await screen.findByRole("button", { name: "Fetch 2 MB and restart" })).toBeEnabled();
+  const tick = screen.getByRole("checkbox");
+  expect(tick).toBeChecked();
+  expect(tick).toBeDisabled();
+  expect(screen.queryByText("Accept the notices above to apply.", { exact: false })).toBeNull();
+});
+
+it("checks the setup again as the channel's own download moves on", async () => {
+  stubFeatures(() => voiceFeature({ enabled: true, runtime_status: "running" }));
+  let background: Record<string, unknown> | null = {
+    state: "fetching", keys: ["vad/silero/v6/onnx"], error: null, retry_unix: null, session_id: "own1",
+    progress: { stage: "fetch", key: "vad/silero/v6/onnx", file: "model.onnx", done_bytes: 0, total_bytes: 2_000_000, keys_done: 0, keys_total: 1 },
+  };
+  stubPlan(() => ({ plan: background ? SILERO_FETCH : { ...SILERO_FETCH, fetch: [], fetch_bytes: 0 }, background }));
+  renderSettingsView({ initialSection: "channels" });
+  fireEvent.click(await screen.findByRole("button", { name: "View Voice settings" }));
+  await screen.findByText(/The channel is downloading/);
+  const before = validateCalls().length;
+  background = { state: "reloading", keys: [], error: null, retry_unix: null };
+  // a reload is over before the status poll could see it: the panel follows it on the plan
+  const slow = { timeout: 4000 };
+  expect(await screen.findByText("The channel's download landed. It reloads at its next quiet moment.", {}, slow)).toBeInTheDocument();
+  await waitFor(() => expect(validateCalls().length).toBe(before + 1), slow);
+  background = null;
+  await waitFor(() => expect(screen.queryByText(/reloads at its next quiet moment/)).toBeNull(), slow);
+  await waitFor(() => expect(validateCalls().length).toBe(before + 2), slow);
+});

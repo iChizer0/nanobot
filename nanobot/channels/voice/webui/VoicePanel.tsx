@@ -63,6 +63,7 @@ import {
   ENDED,
   pendingNotices,
   planHasWork,
+  type SyncBackground,
   type SyncPayload,
   type SyncPlan,
   type SyncProgress,
@@ -86,7 +87,9 @@ type SyncRun = { sessionId: string; intervalMs?: number; progress?: SyncProgress
  * Apply runs the channel's connector (core's start/poll/cancel routes): the models the
  * section names are fetched with progress, the ones this flow installed and the section
  * dropped are removed, and core (re)starts the channel on success. The run lives in the
- * gateway: the panel follows it by polling, and picks it up again when reopened.
+ * gateway: the panel follows it by polling, and picks it up again when reopened. The
+ * channel's own download of what its setup lacks shows there too, with a Cancel; the
+ * channel reloads itself once it lands, so core restarts nothing for it.
  */
 export function VoicePanel({
   feature,
@@ -127,6 +130,7 @@ export function VoicePanel({
   const [rawText, setRawText] = useState(() => JSON.stringify(parsePatch(echoedPatch), null, 2));
   const [rawError, setRawError] = useState(false);
   const [plan, setPlan] = useState<SyncPlan | null>(null);
+  const [background, setBackground] = useState<SyncBackground | null>(null);
   const [indexError, setIndexError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
   const [sync, setSync] = useState<SyncRun | null>(null);
@@ -202,6 +206,7 @@ export function VoicePanel({
   // without the connector routes answers 404, and the panel simply has no plan.
   const reloading = useRef(false);
   const cachedAt = useRef<number | undefined>(undefined);
+  const backgroundState = useRef<string | null | undefined>(undefined);
   const settled = useRef(new Set<string>());
   const [indexPoll, setIndexPoll] = useState(0);
   const refreshPlan = useCallback(async (reloadIndex = false) => {
@@ -225,6 +230,14 @@ export function VoicePanel({
         return;
       }
       setPlan(payload.plan ?? null);
+      setBackground(payload.background ?? null);
+      // The channel's own download moved on (failed, landed, reloaded): the Resolved setup
+      // says where it stands, and a reload is over too quickly for the status poll to see.
+      const ownState = payload.background?.state ?? null;
+      if (ownState !== backgroundState.current) {
+        if (backgroundState.current !== undefined) setFormEpoch((epoch) => epoch + 1);
+        backgroundState.current = ownState;
+      }
       setIndexError(payload.index?.error ?? null);
       const cached = payload.index?.cached_unix;
       if (payload.index?.refreshing) {
@@ -244,7 +257,10 @@ export function VoicePanel({
       }
       cachedAt.current = cached;
     } catch {
-      if (serial === planSerial.current) setPlan(null);
+      if (serial === planSerial.current) {
+        setPlan(null);
+        setBackground(null);
+      }
     }
   }, [client, feature.name]);
   useEffect(() => {
@@ -255,6 +271,18 @@ export function VoicePanel({
     const timer = window.setTimeout(() => void refreshPlan(), INDEX_POLL_MS);
     return () => window.clearTimeout(timer);
   }, [indexPoll, refreshPlan]);
+  // The channel's own download is followed on the plan: every second while it runs, and
+  // once more when a failed one is due to try again.
+  useEffect(() => {
+    if (sync || !background) return undefined;
+    const due = background.state === "waiting" && background.retry_unix
+      ? background.retry_unix * 1000 - Date.now() + INDEX_POLL_MS
+      : null;
+    const delay = background.state === "fetching" || background.state === "reloading" ? INDEX_POLL_MS : due;
+    if (delay === null) return undefined;
+    const timer = window.setTimeout(() => void refreshPlan(), Math.max(INDEX_POLL_MS, delay));
+    return () => window.clearTimeout(timer);
+  }, [background, sync, refreshPlan]);
 
   // A run's last word: core (re)started the channel on "succeeded", so its features land
   // and the fields' installed marks are re-read; anything else is said in the notice. Held
@@ -445,6 +473,19 @@ export function VoicePanel({
       setNotice((err as Error).message);
     } finally {
       setPendingEnabled(null);
+    }
+  };
+  // Stops the channel's own download until the channel restarts; the plan says what is left.
+  const cancelBackground = async () => {
+    if (!background?.session_id || cancelling) return;
+    setCancelling(true);
+    try {
+      await cancelChannelConnect(client, feature.name, background.session_id);
+    } catch (err) {
+      setNotice((err as Error).message);
+    } finally {
+      setCancelling(false);
+      void refreshPlan();
     }
   };
   // The connector answers once the download thread has stopped, which can take a chunk.
@@ -747,7 +788,7 @@ export function VoicePanel({
           </div>
         ) : null /* answered without a form: the check rows and the notice say why */}
 
-        {sync || planHasWork(plan) || plan?.unknown.length || indexError ? (
+        {sync || background || planHasWork(plan) || plan?.unknown.length || indexError ? (
           <section className="space-y-2">
             <h4 className="text-[12px] font-medium text-muted-foreground">
               {tx("custom.models", "Models")}
@@ -781,6 +822,56 @@ export function VoicePanel({
                 </div>
               </div>
             ) : (
+              <>
+              {background ? (
+                <div className="space-y-1.5" role="status" aria-live="polite">
+                  {background.state === "fetching" ? (
+                    <>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-[width] motion-reduce:transition-none"
+                          style={{ width: `${background.progress?.total_bytes ? Math.min(100, (100 * background.progress.done_bytes) / background.progress.total_bytes) : 0}%` }}
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] leading-4 text-muted-foreground">
+                        <span className="min-w-0 break-all">
+                          {tx("custom.background", "The channel is downloading {{key}}", { key: background.progress?.key ?? background.keys[0] ?? "" })}
+                          {background.progress?.file ? ` · ${background.progress.file}` : ""}
+                          {background.progress?.total_bytes
+                            ? ` · ${formatBytes(background.progress.done_bytes)} / ${formatBytes(background.progress.total_bytes)}`
+                            : ""}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={cancelling || !background.session_id}
+                          className="h-auto min-h-7 rounded-full px-2.5 text-[11px] text-muted-foreground"
+                          onClick={() => void cancelBackground()}
+                        >
+                          {core("settings.actions.cancel", "Cancel")}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-[11px] leading-4 text-muted-foreground">
+                      {background.state === "reloading"
+                        ? tx("custom.backgroundReload", "The channel's download landed. It reloads at its next quiet moment.")
+                        : background.state === "waiting" && background.retry_unix
+                        ? tx("custom.backgroundRetry", "The channel's download failed. It tries again at {{time}}.", {
+                          time: new Date(background.retry_unix * 1000).toLocaleTimeString(
+                            i18n.resolvedLanguage ?? i18n.language,
+                            { hour: "2-digit", minute: "2-digit" },
+                          ),
+                        })
+                        : tx("custom.backgroundStopped", "The channel's download stopped.")}
+                      {background.error ? (
+                        <span className="mt-0.5 block text-muted-foreground/80 [overflow-wrap:anywhere]">{background.error}</span>
+                      ) : null}
+                    </p>
+                  )}
+                </div>
+              ) : null}
               <ul className="space-y-1.5 text-[12px] leading-5">
                 {plan?.fetch.map((item) => (
                   <li key={item.key} className="min-w-0">
@@ -796,8 +887,8 @@ export function VoicePanel({
                         <input
                           type="checkbox"
                           className="mt-0.5"
-                          checked={accepted.has(item.key)}
-                          disabled={busy}
+                          checked={Boolean(item.accepted) || accepted.has(item.key)}
+                          disabled={busy || Boolean(item.accepted)}
                           onChange={(event) => {
                             const next = new Set(accepted);
                             if (event.target.checked) next.add(item.key);
@@ -847,6 +938,7 @@ export function VoicePanel({
                   </li>
                 ) : null}
               </ul>
+              </>
             )}
           </section>
         ) : null}

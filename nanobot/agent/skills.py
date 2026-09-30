@@ -206,6 +206,7 @@ class SkillsLoader:
         exclude: set[str] | None = None,
         *,
         workspace: Path | None = None,
+        full_paths: bool = False,
     ) -> str:
         """
         Build a summary of all skills (name, description, path, availability).
@@ -216,6 +217,8 @@ class SkillsLoader:
         Args:
             exclude: Set of skill names to omit from the summary.
             workspace: Effective project workspace used to choose safe display paths.
+            full_paths: Show each skill's path ready for ``read_file`` instead of one
+                root per group, for a model that should not have to join them.
 
         Returns:
             Markdown-formatted skills summary.
@@ -247,7 +250,7 @@ class SkillsLoader:
                 display_root = Path("plugins" if source == "plugin" else "skills")
             else:
                 display_root = resolved_root
-            lines = [f"### {label} (`{display_root}`)"]
+            lines = [f"### {label}" if full_paths else f"### {label} (`{display_root}`)"]
             for entry in entries:
                 skill_name = entry["name"]
                 meta = self._get_skill_meta(skill_name)
@@ -257,8 +260,9 @@ class SkillsLoader:
                 if not available:
                     missing = self._get_missing_requirements(meta)
                     suffix = f" (unavailable: {missing})" if missing else " (unavailable)"
-                relative_path = Path(entry["path"]).relative_to(root).as_posix()
-                lines.append(f"- **{skill_name}** — {desc}{suffix}  `{relative_path}`")
+                path = Path(entry["path"]).relative_to(root)
+                shown = (display_root / path if full_paths else path).as_posix()
+                lines.append(f"- **{skill_name}** — {desc}{suffix}  `{shown}`")
             sections.append("\n".join(lines))
         return "\n\n".join(sections)
 

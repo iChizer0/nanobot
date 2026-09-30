@@ -336,6 +336,27 @@ def test_build_skills_summary_keeps_absolute_roots_for_selected_project(tmp_path
     assert str(project.resolve()) not in summary
 
 
+def test_build_skills_summary_full_paths_are_ready_for_read_file(tmp_path: Path) -> None:
+    workspace = tmp_path / "ws"
+    workspace_skills = workspace / "skills"
+    workspace_skills.mkdir(parents=True)
+    _write_skill(workspace_skills, "alpha", body="# Alpha")
+    builtin = tmp_path / "builtin"
+    _write_skill(builtin, "beta", body="# Beta")
+    loader = SkillsLoader(workspace, builtin_skills_dir=builtin)
+
+    summary = loader.build_skills_summary(full_paths=True)
+
+    assert "(`skills`)" not in summary
+    assert "`skills/alpha/SKILL.md`" in summary
+    assert "`skills/beta/SKILL.md`" in summary
+    project = tmp_path / "project"
+    project.mkdir()
+    summary = loader.build_skills_summary(workspace=project, full_paths=True)
+    assert f"`{(workspace_skills / 'alpha' / 'SKILL.md').resolve().as_posix()}`" in summary
+    assert f"`{(builtin / 'beta' / 'SKILL.md').resolve().as_posix()}`" in summary
+
+
 def test_bundled_update_setup_description_is_valid_yaml(tmp_path: Path) -> None:
     metadata = SkillsLoader(tmp_path).get_skill_metadata("update-setup")
 

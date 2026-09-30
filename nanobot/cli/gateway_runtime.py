@@ -93,10 +93,10 @@ class _MCPReadyToolGateway:
         *,
         channel: str,
         chat_id: str,
-        include_skills: bool = True,
+        with_tools: bool = True,
     ) -> str:
         return await self._agent.get_agent_context(
-            channel=channel, chat_id=chat_id, include_skills=include_skills,
+            channel=channel, chat_id=chat_id, with_tools=with_tools,
         )
 
 

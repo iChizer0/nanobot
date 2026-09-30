@@ -144,20 +144,29 @@ class ContextBuilder:
         *,
         workspace: Path | None = None,
         include_memory: bool = True,
-        include_skills: bool = True,
+        with_tools: bool = True,
     ) -> str:
         """The agent's standing context for an external model that runs without this
-        system prompt (e.g. a speech-to-speech backend): the profile files, memory and
-        skills, with no identity, tool contract or format guidance."""
+        system prompt (e.g. a speech-to-speech backend): the profile files and memory,
+        with no runtime, tool contract or format guidance. ``with_tools``: the model holds
+        the agent's tools, so it also gets the workspace files and who may edit them, and
+        the skills, each at its read_file path."""
         root = workspace or self.workspace
-        parts = [f"# Workspace\n\nWorking directory: {root.expanduser().resolve()}"]
+        workspace_part = f"# Workspace\n\nWorking directory: {root.expanduser().resolve()}"
+        if with_tools:
+            workspace_part += "\n" + render_template(
+                "agent/_snippets/workspace_files.md",
+                workspace_path=str(root.expanduser().resolve()),
+                agent_workspace_path=str(self.workspace.expanduser().resolve()),
+            )
+        parts = [workspace_part]
         bootstrap = self._load_bootstrap_files(root)
         if bootstrap:
             parts.append(bootstrap)
         if include_memory:
             parts.extend(self._memory_sections())
-        if include_skills:
-            parts.extend(self._skills_sections(root))
+        if with_tools:
+            parts.extend(self._skills_sections(root, full_paths=True))
         return "\n\n---\n\n".join(parts)
 
     def _memory_sections(self) -> list[str]:
@@ -166,7 +175,7 @@ class ContextBuilder:
             return [f"# Memory\n\n## Long-term Memory\n{memory}"]
         return []
 
-    def _skills_sections(self, root: Path) -> list[str]:
+    def _skills_sections(self, root: Path, *, full_paths: bool = False) -> list[str]:
         parts: list[str] = []
         active_skills = self.skills.get_always_skills()
         if active_skills:
@@ -176,9 +185,16 @@ class ContextBuilder:
         skills_summary = self.skills.build_skills_summary(
             exclude=set(active_skills),
             workspace=root,
+            full_paths=full_paths,
         )
         if skills_summary:
-            parts.append(render_template("agent/skills_section.md", skills_summary=skills_summary))
+            parts.append(
+                render_template(
+                    "agent/skills_section.md",
+                    skills_summary=skills_summary,
+                    full_paths=full_paths,
+                )
+            )
         return parts
 
     def _get_identity(self, channel: str | None = None, workspace: Path | None = None) -> str:

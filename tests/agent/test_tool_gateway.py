@@ -180,7 +180,7 @@ async def test_get_tool_definitions_does_not_alias_the_registry_cache(tmp_path) 
     """Callers adapt schemas for their model; that must not reach the agent."""
     loop = _make_loop(tmp_path)
     defs = await loop.get_tool_definitions()
-    assert defs == loop.tools.get_definitions()
+    assert defs == [d for d in loop.tools.get_definitions() if d in defs]
 
     before = len(loop.tools.get_definitions())
     defs.append({"type": "function", "function": {"name": "injected"}})
@@ -193,6 +193,23 @@ async def test_get_tool_definitions_does_not_alias_the_registry_cache(tmp_path) 
 
 
 @pytest.mark.asyncio
+async def test_get_tool_definitions_leaves_out_what_only_a_turn_can_run(tmp_path) -> None:
+    """create_goal needs a turn's permission, which execute_tool never grants: offered, it
+    only refuses. update_goal stays: completing or cancelling a goal needs none."""
+    loop = _make_loop(tmp_path)
+    registered = {d["function"]["name"] for d in loop.tools.get_definitions()}
+    assert {"create_goal", "update_goal", "read_file"} <= registered
+
+    offered = {d["function"]["name"] for d in await loop.get_tool_definitions()}
+
+    assert offered == registered - {"create_goal"}
+    refused = await loop.execute_tool(
+        "create_goal", {"objective": "plan a trip"}, channel="voice", chat_id="local",
+    )
+    assert getattr(refused, "is_error", False)
+
+
+@pytest.mark.asyncio
 async def test_get_agent_context_carries_profile_memory_and_skills(tmp_path) -> None:
     loop = _make_loop(tmp_path)
     (tmp_path / "USER.md").write_text("The user is Ada; she likes short answers.\n")
@@ -202,19 +219,30 @@ async def test_get_agent_context_carries_profile_memory_and_skills(tmp_path) -> 
     text = await loop.get_agent_context(channel="voice", chat_id="local")
 
     assert f"Working directory: {tmp_path.resolve()}" in text
+    # Where the agent keeps its files, and that only memory consolidation edits them.
+    assert "- Long-term memory: memory/MEMORY.md" in text
+    assert "Only Dream memory-consolidation tasks may edit" in text
     assert "The user is Ada" in text
     assert "Ada's cat is called Turing." in text
-    assert "SKILL.md" in text  # the skills index, read through read_file
+    # The skills index, each skill at the path read_file takes: nothing left to join.
+    assert "`skills/weather/SKILL.md`" in text
+    assert "join them" not in text
     # Not the system prompt: no identity or tool contract.
     assert text != loop.context.build_system_prompt(channel="voice")
     assert len(text) < len(loop.context.build_system_prompt(channel="voice"))
 
 
 @pytest.mark.asyncio
-async def test_get_agent_context_can_leave_skills_out(tmp_path) -> None:
+async def test_get_agent_context_without_tools_leaves_files_and_skills_out(tmp_path) -> None:
+    """A model that only talks (the voice channel's supervisor) cannot follow a skill or
+    grep the history log: both would send it down paths it has no tools for."""
     loop = _make_loop(tmp_path)
-    text = await loop.get_agent_context(channel="voice", chat_id="local", include_skills=False)
-    assert "SKILL.md" not in text
+    (tmp_path / "USER.md").write_text("The user is Ada.\n")
+    text = await loop.get_agent_context(channel="voice", chat_id="local", with_tools=False)
+    assert f"Working directory: {tmp_path.resolve()}" in text
+    assert "The user is Ada." in text
+    assert "# Skills" not in text and "SKILL.md" not in text
+    assert "history.jsonl" not in text and "Only Dream" not in text
 
 
 @pytest.mark.asyncio

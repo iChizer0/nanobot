@@ -124,6 +124,9 @@ if TYPE_CHECKING:
     from nanobot.triggers.local_store import LocalTriggerStore
 
 _T = TypeVar("_T")
+# create_goal needs a turn's permission to set a goal, which execute_tool never grants:
+# offered to a channel-driven model, it only refuses.
+_TURN_ONLY_TOOLS = frozenset({"create_goal"})
 _SUBAGENT_PROVIDER_TASK_META = "subagent_provider_task_id"
 _SUBAGENT_TERMINAL_WAIT_SECONDS = 300.0
 
@@ -241,14 +244,18 @@ class AgentLoop:
     def model_preset(self, name: str | None) -> None:
         self.set_model_preset(name)
 
-    async def get_tool_definitions(self) -> list[dict]:
+    async def get_tool_definitions(self) -> list[dict[str, Any]]:
         """OpenAI-style function schemas for this loop's live tool registry.
 
-        For a channel that drives an external model emitting its own tool calls.
-        Returns a copy: the registry hands out its cached list, and callers adapt
-        schemas to their model's dialect.
+        For a channel that drives an external model emitting its own tool calls, so
+        only the tools ``execute_tool`` can serve. Returns a copy: the registry hands
+        out its cached list, and callers adapt schemas to their model's dialect.
         """
-        return copy.deepcopy(self.tools.get_definitions())
+        return [
+            copy.deepcopy(schema)
+            for schema in self.tools.get_definitions()
+            if ToolRegistry._schema_name(schema) not in _TURN_ONLY_TOOLS
+        ]
 
     async def execute_tool(
         self,
@@ -295,16 +302,17 @@ class AgentLoop:
         *,
         channel: str,
         chat_id: str,
-        include_skills: bool = True,
+        with_tools: bool = True,
     ) -> str:
-        """The agent's standing context (workspace, profile files, memory, skills) for
-        an external model that runs without nanobot's system prompt, resolved for the
-        session the bus would use. Memory is left out where the session keeps none."""
+        """The agent's standing context (workspace, profile files, memory and, for a
+        model holding the agent's tools, its files and skills) for an external model that
+        runs without nanobot's system prompt, resolved for the session the bus would use.
+        Memory is left out where the session keeps none."""
         _, session, scope = self._channel_session_scope(channel, chat_id)
         return self.context.build_agent_context(
             workspace=scope.project_path,
             include_memory=session.policy.persist,
-            include_skills=include_skills,
+            with_tools=with_tools,
         )
 
     def _channel_session_scope(self, channel: str, chat_id: str) -> tuple[str, Session, WorkspaceScope]:

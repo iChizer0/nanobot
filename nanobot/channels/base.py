@@ -31,7 +31,8 @@ class ToolGateway(Protocol):
     """
 
     async def get_tool_definitions(self) -> list[dict]:
-        """OpenAI-style function schemas for the agent's live tool registry."""
+        """OpenAI-style function schemas for the agent's live tool registry, less the
+        tools ``execute_tool`` cannot run."""
         ...
 
     async def execute_tool(
@@ -50,10 +51,10 @@ class ToolGateway(Protocol):
         *,
         channel: str,
         chat_id: str,
-        include_skills: bool = True,
+        with_tools: bool = True,
     ) -> str:
-        """The agent's workspace, profile files, memory and skills, for the external
-        model's instructions."""
+        """The agent's profile files and memory for the external model's instructions,
+        with the workspace files and skills when that model holds the agent's tools."""
         ...
 
 

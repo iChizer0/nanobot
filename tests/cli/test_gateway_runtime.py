@@ -120,8 +120,8 @@ async def test_tool_gateway_connects_mcp_before_listing_tools() -> None:
             calls.append(("run", name, args, channel, chat_id))
             return "ok"
 
-        async def get_agent_context(self, *, channel, chat_id, include_skills=True):
-            calls.append(("context", channel, chat_id, include_skills))
+        async def get_agent_context(self, *, channel, chat_id, with_tools=True):
+            calls.append(("context", channel, chat_id, with_tools))
             return "ctx"
 
     gateway = _MCPReadyToolGateway(_Agent(), provider)
@@ -130,7 +130,7 @@ async def test_tool_gateway_connects_mcp_before_listing_tools() -> None:
         {"type": "function", "function": {"name": "t"}}
     ]
     assert await gateway.execute_tool("t", {"a": 1}, channel="voice", chat_id="c") == "ok"
-    assert await gateway.get_agent_context(channel="voice", chat_id="c", include_skills=False) == "ctx"
+    assert await gateway.get_agent_context(channel="voice", chat_id="c", with_tools=False) == "ctx"
     assert calls == [
         ("list", 1),
         ("run", "t", {"a": 1}, "voice", "c"),

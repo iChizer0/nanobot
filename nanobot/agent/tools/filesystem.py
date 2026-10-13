@@ -2,9 +2,11 @@
 
 # pyright: reportPrivateUsage=false, reportUnusedFunction=false
 
+import asyncio
 import difflib
 import hashlib
 import mimetypes
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -1139,6 +1141,20 @@ class ListDirTool(_FsTool):
     def read_only(self) -> bool:
         return True
 
+    def _walk(self, dp: Path, cap: int) -> tuple[list[str], int]:
+        """Every entry under ``dp`` outside the ignored directories, in path order: the
+        first ``cap`` as listing lines, and how many there are. Ignored directories are
+        pruned, never walked (``rglob`` lists node_modules whole before dropping it)."""
+        found: list[tuple[Path, bool]] = []
+        for dirpath, dirnames, filenames in os.walk(dp):
+            dirnames[:] = [d for d in dirnames if d not in self._IGNORE_DIRS]
+            rel = Path(dirpath).relative_to(dp)
+            found.extend((rel / d, True) for d in dirnames)
+            found.extend((rel / f, False) for f in filenames if f not in self._IGNORE_DIRS)
+        found.sort(key=lambda entry: entry[0])
+        items = [f"{rel}/" if is_dir else str(rel) for rel, is_dir in found[:cap]]
+        return items, len(found)
+
     async def execute(
         self, path: str | None = None, recursive: bool = False,
         max_entries: int | None = None, **kwargs: Any,
@@ -1157,13 +1173,9 @@ class ListDirTool(_FsTool):
             total = 0
 
             if recursive:
-                for item in sorted(dp.rglob("*")):
-                    if any(p in self._IGNORE_DIRS for p in item.parts):
-                        continue
-                    total += 1
-                    if len(items) < cap:
-                        rel = item.relative_to(dp)
-                        items.append(f"{rel}/" if item.is_dir() else str(rel))
+                # Off the event loop: a big tree takes seconds to walk, and every other
+                # task (a voice channel's playback among them) would wait for it.
+                items, total = await asyncio.to_thread(self._walk, dp, cap)
             else:
                 for item in sorted(dp.iterdir()):
                     if item.name in self._IGNORE_DIRS:

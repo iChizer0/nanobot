@@ -8,6 +8,7 @@ import asyncio
 import copy
 import dataclasses
 import os
+import threading
 import time
 import weakref
 from collections.abc import Coroutine, Iterable, Mapping
@@ -106,7 +107,7 @@ from nanobot.session.summary import (
 from nanobot.triggers.local_turns import LocalTriggerTurnCoordinator
 from nanobot.utils.cancellation import task_is_cancelling
 from nanobot.utils.document import reference_non_image_attachments
-from nanobot.utils.helpers import image_placeholder_text
+from nanobot.utils.helpers import image_placeholder_text, warm_token_encoding
 from nanobot.utils.llm_runtime import LLMRuntime
 from nanobot.utils.progress_events import output_events
 from nanobot.utils.runtime import (
@@ -1419,6 +1420,7 @@ class AgentLoop:
         self._running = True
         try:
             logger.info("Agent loop started")
+            threading.Thread(target=warm_token_encoding, name="token-encoding", daemon=True).start()
 
             while self._running:
                 try:

@@ -109,6 +109,14 @@ def _get_token_encoding() -> Any:
     return tiktoken.get_encoding("cl100k_base")
 
 
+def warm_token_encoding() -> None:
+    """Load the token estimate's encoding now: its first use downloads it, with no timeout,
+    wherever it is called from. For a worker thread at startup, so no turn pays for it on
+    the event loop."""
+    with suppress(Exception):
+        _get_token_encoding()
+
+
 def _cache_tools_token_count(
     tools_id: int,
     fingerprint: tuple[int, ...],
